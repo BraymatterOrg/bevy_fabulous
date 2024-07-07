@@ -1,0 +1,10 @@
+[package]
+name = "bevy_prefabulous"
+version = "0.1.0"
+edition = "2021"
+
+[[example]]
+name="prefab"
+
+[dependencies]
+bevy="0.14"
