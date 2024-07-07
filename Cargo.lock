@@ -551,6 +551,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_fabulous"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_gilrs"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -775,13 +782,6 @@ dependencies = [
  "radsort",
  "smallvec",
  "static_assertions",
-]
-
-[[package]]
-name = "bevy_prefabulous"
-version = "0.1.0"
-dependencies = [
- "bevy",
 ]
 
 [[package]]

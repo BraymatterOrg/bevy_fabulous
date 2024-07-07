@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::{core_pipeline::bloom::BloomSettings, prelude::*};
-use bevy_prefabulous::{prefab::{Prefab, PrefabPipe}, FabManager, FabulousPlugin};
+use bevy_fabulous::{prefab::{Prefab, PrefabPipe}, FabManager, FabulousPlugin};
 
 fn main() {
     let mut app = App::new();
