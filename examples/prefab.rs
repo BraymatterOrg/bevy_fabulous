@@ -1,5 +1,5 @@
-use bevy::{ecs::system::BoxedSystem, prelude::*};
-use bevy_prefabulous::{pipe, FabManager, FabulousPlugin, Prefab, PrefabPipe};
+use bevy::prelude::*;
+use bevy_prefabulous::{FabManager, FabulousPlugin, Prefab, PrefabPipe};
 
 fn main() {
     let mut app = App::new();
@@ -7,9 +7,13 @@ fn main() {
     app.add_plugins(DefaultPlugins);
     app.add_plugins(FabulousPlugin);
 
-    app.add_systems(Startup, load_minion_asset);
-
+    app.add_systems(Startup, (load_minion_asset, setup_scene).chain());
+    
     app.run();
+}
+
+fn setup_scene(){
+    
 }
 
 fn load_minion_asset(
@@ -23,20 +27,19 @@ fn load_minion_asset(
         asset_scene: gltf_handle,
     });
 
-    fabs.register_loaded_prefab(Prefab {
-        path: "earthminion.glb".to_string(),
-        node_pipe: vec![
-            pipe(get_thing),
-            Box::new(OuterGearRotate {
+    fabs.register_prefab(
+        Prefab::new("earthminion.glb")
+            .with_system(inner_gear_rotate)
+            .with_pipe(OuterGearRotate {
                 rotation_rate: 6.28,
             }),
-        ],
-    });
+    )
 }
 
-fn get_thing() -> BoxedSystem {
-    Box::new(IntoSystem::into_system(inner_gear_rotate)) as BoxedSystem
-}
+//TODO: Impl trait for fn that returns this closure?
+// fn gen_gear_rotate_sys() -> BoxedSystem {
+//     Box::new(IntoSystem::into_system(inner_gear_rotate)) as BoxedSystem
+// }
 
 #[derive(Resource)]
 pub struct ExampleResource {
@@ -44,10 +47,10 @@ pub struct ExampleResource {
 }
 
 //Define a prefab pipe as a system
-fn inner_gear_rotate(entities: Query<(Entity, &Name)>) {
+fn inner_gear_rotate(entities: Query<&Name>) {
     info!("Inner Gear Rotate");
 
-    for (ent, name) in entities.iter() {
+    for name in entities.iter() {
         info!("Found entity: {}", name);
     }
 }
@@ -58,7 +61,7 @@ pub struct OuterGearRotate {
 }
 
 impl PrefabPipe for OuterGearRotate {
-    fn apply(&mut self, world: &mut World) {
+    fn apply(&mut self, _world: &mut World) {
         info!("I AM A PIPE I AM A PIPE");
     }
 }

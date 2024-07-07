@@ -75,7 +75,7 @@ fn apply_pipes_to_loaded_scene(
         };
 
         // Apply all pipes to the scene
-        for pipe in prefab.node_pipe.iter_mut() {
+        for pipe in prefab.pipeline.iter_mut() {
             pipe.apply(&mut scene.world);
         }
     }
@@ -88,7 +88,7 @@ pub struct FabManager {
 }
 
 impl FabManager {
-    pub fn register_loaded_prefab(&mut self, prefab: Prefab) {
+    pub fn register_prefab(&mut self, prefab: Prefab) {
         self.prefabs.insert(prefab.path.clone(), prefab);
     }
 
@@ -137,28 +137,43 @@ pub struct Prefab {
     pub path: String,
 
     /// Pipes to run on load
-    pub node_pipe: Vec<Box<dyn PrefabPipe + Send + Sync>>,
+    pub pipeline: Vec<Box<dyn PrefabPipe + Send + Sync>>,
 }
 
 impl Prefab {
+    /// Create a new, prefab based on a scene with no modifications
     pub fn new(path: impl Into<String>) -> Self {
         Self {
             path: path.into(),
-            node_pipe: vec![],
+            pipeline: vec![],
         }
     }
 
+    /// Add a step to the prefab's pipeline
     pub fn with_pipe<T: PrefabPipe + Send + Sync + 'static>(mut self, pipe: T) -> Self {
-        self.node_pipe.push(Box::new(pipe));
+        self.pipeline.push(Box::new(pipe));
         self
     }
 
+    /// Add multiple steps of the same kind to a prefab's pipeline
     pub fn with_pipes<T: PrefabPipe + Send + Sync + 'static>(mut self, pipes: Vec<T>) -> Self {
-        for pipe in pipes{
-            self.node_pipe.push(Box::new(pipe));
+        for pipe in pipes {
+            self.pipeline.push(Box::new(pipe));
         }
+
+        self
+    }
+    
+    /// Add a **System** as a pipeline step. Internally registers the system to the scene world, runs, and deletes the SystemId entity
+    pub fn with_system<M>(mut self, sys: impl IntoSystem<(), (), M> + Send + Sync + 'static + Copy ) -> Self{                
+        self = self.with_pipe(Self::system(sys));
         
         self
+    }
+    
+    /// Cursed Trait Boxing magic to make a nice API for you UwU
+    fn system<M, T: IntoSystem<(), (), M> + Send + Sync + 'static + Copy>(a: T) -> Box<dyn FnMut() -> BoxedSystem + Send + Sync>{
+        Box::new(move || { Box::new(IntoSystem::into_system(a)) as BoxedSystem})
     }
 }
 
@@ -168,7 +183,7 @@ pub trait PrefabPipe {
     fn apply(&mut self, world: &mut World);
 }
 
-impl<T: Fn() -> BoxedSystem + Send + Sync> PrefabPipe for T {
+impl<T: FnMut() -> BoxedSystem + Send + Sync> PrefabPipe for T {
     fn apply(&mut self, world: &mut World) {
         let sys = self();
         let sys_id = world.register_boxed_system(sys);
@@ -177,7 +192,10 @@ impl<T: Fn() -> BoxedSystem + Send + Sync> PrefabPipe for T {
     }
 }
 
-/// Applies ScenePipes to an entity after it's been spawned
+/// Postfabs are used to modify a scene every time it's spawned
+/// You may use these to pass in contextual information information at the time
+/// of spawning such as changing the material color based on health / faction etc. 
+/// These run every time you spawn the PostFab
 pub struct PostFab {
     pub scene: Handle<Scene>,
     pub pipes: Vec<Box<dyn PostfabPipe + Send + Sync>>,
@@ -185,7 +203,7 @@ pub struct PostFab {
 
 impl Component for PostFab {
     const STORAGE_TYPE: StorageType = StorageType::Table;
-
+    
     fn register_component_hooks(hooks: &mut bevy::ecs::component::ComponentHooks) {
         hooks.on_add(|mut world, targeted_entity, _component_id| {
             let Some(mut entmut) = world.get_entity_mut(targeted_entity) else {
