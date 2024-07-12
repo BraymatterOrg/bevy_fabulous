@@ -1,6 +1,6 @@
 use bevy::{ecs::system::BoxedSystem, prelude::*};
 
-use crate::FabManager;
+use crate::{FabManager, PostFabTarget};
 
 /// Apply pipes to  the loaded Scene
 pub fn apply_pipes_to_loaded_scene(
@@ -17,27 +17,17 @@ pub fn apply_pipes_to_loaded_scene(
         };
 
         //Get the path of the asset
-        let Some(asset_path) = asset_server.get_path(id.untyped()) else {
+        let Some(scene_handle) = asset_server.get_id_handle::<Scene>(*id) else {
             debug!("Could not get asset path for asset! {}", id);
             continue;
         };
-        let path = asset_path.to_string();
 
         //Get the prefab from the manager if it exists
-        let Some(prefab) = prefabs.loaded_prefab_mut(path.clone()) else {
+        let Some(prefab) = prefabs.prefab_mut(&scene_handle) else {
             continue;
         };
 
-        debug!("Found prefab definition for loaded asset: {}", path);
-
-        //Get the  Scene
-        let Some(scene_handle) = asset_server.get_handle::<Scene>(path.clone()) else {
-            warn!(
-                "Could not get scene for asset path :{} from asset server",
-                path
-            );
-            continue;
-        };
+        debug!("Found prefab definition for loaded asset: {:?}", scene_handle);
 
         let Some(scene) = scenes.get_mut(scene_handle.id()) else {
             warn!("Could not get scene from gltf from Asset<Scene>");
@@ -54,7 +44,7 @@ pub fn apply_pipes_to_loaded_scene(
 /// Applies ScenePipes to the loaded scene `World`
 pub struct Prefab {
     /// The path to the asset on the filesystem
-    pub path: String,
+    pub target: PostFabTarget,
 
     /// Pipes to run on load
     pub pipeline: Vec<Box<dyn PrefabPipe + Send + Sync>>,
@@ -62,9 +52,9 @@ pub struct Prefab {
 
 impl Prefab {
     /// Create a new, prefab based on a scene with no modifications
-    pub fn new(path: impl Into<String>) -> Self {
+    pub fn new(target: PostFabTarget) -> Self {
         Self {
-            path: path.into(),
+            target,
             pipeline: vec![],
         }
     }

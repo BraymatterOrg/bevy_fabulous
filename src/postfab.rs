@@ -6,8 +6,7 @@ use bevy::{
     scene::SceneInstance,
 };
 
-use crate::FabManager;
-pub struct PostFabPlugin;
+use crate::{FabManager, PostFabTarget};
 
 /// Whenever a scene handle is added to an entity consult the fab manager
 /// and add a postfab if found
@@ -46,15 +45,14 @@ pub fn handle_scene_postfabs(world: &mut World) {
         if !scene_spawner.instance_is_ready(**instance) {
             continue;
         }
-        
+
         root_entities.push(entity);
-        
+
         //Iterate over all of a postfabs pipe
         for pipe in postfab.pipes.iter() {
             //Attempt to apply to any children
-            'child: for applicable_entity in children
-                .iter_descendants(entity)
-                .chain(std::iter::once(entity))
+            'child: for applicable_entity in
+                std::iter::once(entity).chain(children.iter_descendants(entity))
             {
                 let Some(ent) = world.get_entity(applicable_entity) else {
                     warn!("Could not get entity for postfab, aborting postfab");
@@ -95,11 +93,11 @@ pub fn handle_scene_postfabs(world: &mut World) {
             }
         }
     }
-    
-    for ent in root_entities{
+
+    for ent in root_entities {
         world.entity_mut(ent).remove::<PostFab>();
     }
-    
+
     for (system, ent) in pipes_to_run {
         if let Err(e) = world.run_system_with_input(system, ent) {
             error!("Error running system for postfab pipe!\n {}", e);
@@ -115,12 +113,6 @@ pub fn handle_scene_postfabs(world: &mut World) {
 pub struct PostFab {
     pub scene: PostFabTarget,
     pub pipes: Vec<PostfabPipe>,
-}
-
-#[derive(Clone)]
-pub enum PostFabTarget {
-    Scene(Handle<Scene>),
-    Gltf(Handle<Gltf>),
 }
 
 #[derive(Clone)]
