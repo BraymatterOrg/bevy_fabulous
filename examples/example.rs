@@ -1,7 +1,12 @@
 use std::f32::consts::PI;
 
-use bevy::{core_pipeline::bloom::BloomSettings, prelude::*};
-use bevy_fabulous::{prefab::{Prefab, PrefabPipe}, FabManager, FabulousPlugin};
+use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
+use bevy_fabulous::{
+    materials::{FabulousMaterialsPlugin, NamedMaterialIndex},
+    postfab::{NameCriteria, PostFab, PostFabTarget, PostfabPipe},
+    prefab::{Prefab, PrefabPipe},
+    FabManager, FabulousPlugin,
+};
 
 fn main() {
     let mut app = App::new();
@@ -9,8 +14,11 @@ fn main() {
     app.register_type::<Bob>();
 
     app.add_plugins(DefaultPlugins);
-    app.add_plugins(FabulousPlugin);
-    
+    app.add_plugins((
+        FabulousPlugin,
+        FabulousMaterialsPlugin::<StandardMaterial>::default(),
+    ));
+
     app.insert_state(GameState::Loading);
 
     //Load minion asset, and wait until it's loaded
@@ -21,29 +29,33 @@ fn main() {
     app.add_systems(OnEnter(GameState::Loaded), setup_scene);
 
     //Spin me _right_ round
-    app.add_systems(Update, (rotate_over_time, bob));
+    app.add_systems(Update, (rotate_over_time, bob, scale));
     app.run();
 }
 
-fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
+fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>, gltfs: Res<Assets<Gltf>>) {
     //Spawn Camera
-    cmds.spawn((Camera3dBundle {
-        camera: Camera {
-            hdr: true,
-            clear_color: ClearColorConfig::Custom(Color::BLACK.lighter(0.5)),
+    cmds.spawn((
+        Camera3dBundle {
+            camera: Camera {
+                hdr: true,
+                clear_color: ClearColorConfig::Custom(Color::BLACK.lighter(0.03)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(10.0, 10.0, 10.0))
+                .looking_at(Vec3::ZERO, Dir3::Y),
             ..default()
         },
-        transform: Transform::from_translation(Vec3::new(10.0, 10.0, 10.0))
-            .looking_at(Vec3::ZERO, Dir3::Y),
-        ..default()
-    }, BloomSettings::OLD_SCHOOL));
+        BloomSettings::OLD_SCHOOL,
+    ));
 
     info!("Spawning Minion");
     //Spawn Minion
-    cmds.spawn(SceneBundle {
-        scene: ex.asset_scene.clone(),
-        ..default()
-    });
+    let scene = gltfs.get(ex.asset_scene.id()).unwrap().scenes[0].clone();
+    cmds.spawn((
+        SceneBundle { scene, ..default() },
+        Name::new("Minion Scene"),
+    ));
 
     //Shine a little light on me
     cmds.spawn(DirectionalLightBundle {
@@ -55,6 +67,7 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
                 blue: 0.8,
                 alpha: 1.0,
             }),
+            illuminance: 600.0,
             ..default()
         },
         ..default()
@@ -65,20 +78,40 @@ fn load_minion_asset(
     asset_server: ResMut<AssetServer>,
     mut cmds: Commands,
     mut fabs: ResMut<FabManager>,
+    mut mats: ResMut<Assets<StandardMaterial>>,
+    mut mat_index: ResMut<NamedMaterialIndex<StandardMaterial, StandardMaterial>>,
 ) {
-    let scene_handle = asset_server.load("earthminion.glb#Scene0");
+    let scene_handle = asset_server.load("earthminion.glb");
 
     cmds.insert_resource(ExampleResource {
         asset_scene: scene_handle.clone(),
     });
 
+    //Create and register new material to be swapped out
+    let earth_mana = StandardMaterial {
+        emissive: (palettes::css::LIMEGREEN * 2.0).into(),
+        ..default()
+    };
+
+    mat_index.register_main_mat("EarthMana", mats.add(earth_mana));
+
     fabs.register_prefab(
         Prefab::new("earthminion.glb#Scene0")
             .with_system(inner_gear_rotate)
-            .with_pipe(HeadPipe {
+            .with_pipe(RotateHeadPipe {
                 rotation_rate: PI / 10.0,
             }),
     );
+
+    fabs.register_postfab(PostFab {
+        scene: PostFabTarget::Gltf(scene_handle),
+        pipes: vec![PostfabPipe {
+            system: cmds.register_one_shot_system(add_scalar_to_orbiters),
+            with_components: vec![],
+            without_components: vec![],
+            with_name: Some(NameCriteria::Contains("Orbiter".to_string())),
+        }],
+    })
 }
 
 fn poll_loaded(
@@ -93,7 +126,7 @@ fn poll_loaded(
 
 #[derive(Resource)]
 pub struct ExampleResource {
-    pub asset_scene: Handle<Scene>,
+    pub asset_scene: Handle<Gltf>,
 }
 
 #[derive(States, Debug, Clone, Eq, PartialEq, PartialOrd, Hash)]
@@ -131,11 +164,11 @@ fn inner_gear_rotate(entities: Query<(Entity, &Name)>, mut cmds: Commands) {
 }
 
 //Define a prefab pipe as a struct
-pub struct HeadPipe {
+pub struct RotateHeadPipe {
     pub rotation_rate: f32,
 }
 
-impl PrefabPipe for HeadPipe {
+impl PrefabPipe for RotateHeadPipe {
     fn apply(&mut self, world: &mut World) {
         info!("Running Head Rotate Pipe");
 
@@ -169,6 +202,15 @@ impl PrefabPipe for HeadPipe {
     }
 }
 
+fn add_scalar_to_orbiters(target: In<Entity>, mut cmds: Commands, names: Query<&Name>) {
+    info!("Adding Scalar: {}", names.get(target.0).unwrap());
+    cmds.entity(target.0).insert(ScaleOverTime {
+        factor: Vec3::splat(1.2),
+        frequency: 1.0,
+        base_scale: Vec3::splat(1.0),
+    });
+}
+
 //Scene Systems!
 
 #[derive(Component, Reflect)]
@@ -193,8 +235,22 @@ pub struct Bob {
 
 pub fn bob(mut bobbers: Query<(&mut Transform, &Bob)>, time: Res<Time>) {
     for (mut tsf, bobber) in bobbers.iter_mut() {
-        tsf.translation.y = bobber.anchor + (time.elapsed_seconds() * bobber.frequency).sin() * (bobber.amplitude );
+        tsf.translation.y =
+            bobber.anchor + (time.elapsed_seconds() * bobber.frequency).sin() * (bobber.amplitude);
     }
 }
 
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+pub struct ScaleOverTime {
+    pub factor: Vec3,
+    pub frequency: f32,
+    pub base_scale: Vec3,
+}
 
+fn scale(mut scaler: Query<(&mut Transform, &ScaleOverTime)>, time: Res<Time>) {
+    for (mut tsf, scaler) in scaler.iter_mut() {
+        tsf.scale =
+            scaler.base_scale + (time.elapsed_seconds() * scaler.frequency).sin().abs() * (scaler.factor - scaler.base_scale);
+    }
+}
