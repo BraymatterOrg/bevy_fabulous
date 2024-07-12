@@ -45,18 +45,17 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
                     };
 
                     for (named, mat) in gltf.named_materials.iter() {
-                        info!("Found Named Material: {}", named);
+                        debug!("Found Named Material: {}", named);
                         if mat_registry.contains_override(named.to_string()) {
                             if let Err(e) =
                                 mat_registry.register_swap_mat(named.to_string(), mat.clone())
                             {
                                 error!("Error registering new swap material: \n {}", e);
                             } else {
-                                info!("Registering Swap Mat!")
+                                debug!("Registering Swap Mat!")
                             }
                         }
                     }
-                    info!("Load Asset Event!")
                 }
                 _ => {}
             }

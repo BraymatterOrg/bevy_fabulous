@@ -68,7 +68,6 @@ pub fn handle_scene_postfabs(world: &mut World) {
                             }
                         }
                         None => {
-                            info!("Name not found");
                             continue 'child;
                         }
                     }

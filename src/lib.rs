@@ -134,7 +134,7 @@ fn convert_gltffabs_to_scenefabs(
             continue;
         };
 
-        info!("Converting GLTF Postfab To Scene!");
+        debug!("Converting GLTF Postfab To Scene!");
         fabs.postfabs.insert(scene.clone(), fab);
     }
 
@@ -154,7 +154,7 @@ fn convert_gltffabs_to_scenefabs(
             continue;
         };
 
-        info!("Converting GLTF Postfab To Scene!");
+        debug!("Converting GLTF Postfab To Scene!");
         fabs.prefabs.insert(scene.clone(), fab);
     }
 }
