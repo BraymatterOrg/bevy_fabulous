@@ -58,9 +58,9 @@ pub fn handle_scene_postfabs(world: &mut World) {
                     warn!("Could not get entity for postfab, aborting postfab");
                     continue;
                 };
-                let pipe = pipe.clone();
+                
                 //Check if enity has required Name
-                if let Some(criteria) = pipe.with_name {
+                if let Some(criteria) = &pipe.with_name {
                     match ent.get::<Name>() {
                         Some(n) => {
                             if !criteria.eval(n) {
@@ -75,15 +75,15 @@ pub fn handle_scene_postfabs(world: &mut World) {
                 }
 
                 //Check if entity has required components
-                for t in pipe.with_components {
-                    if !ent.contains_type_id(t) {
+                for t in &pipe.with_components {
+                    if !ent.contains_type_id(*t) {
                         continue 'child;
                     }
                 }
 
                 //Check if entity does not have components
-                for t in pipe.without_components {
-                    if ent.contains_type_id(t) {
+                for t in &pipe.without_components {
+                    if ent.contains_type_id(*t) {
                         continue 'child;
                     }
                 }
