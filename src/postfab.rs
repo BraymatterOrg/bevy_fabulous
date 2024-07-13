@@ -6,11 +6,12 @@ use bevy::{
     scene::SceneInstance,
 };
 
-use crate::FabManager;
-pub struct PostFabPlugin;
+use crate::{FabManager, FabTarget};
 
 /// Whenever a scene handle is added to an entity consult the fab manager
-/// and add a postfab if found
+/// and add a postfab if found. Postfabs are 'read-only' and can probably be 
+/// replaced with a reference/HashMap lookup so we don't have to worry about the performance of
+/// a copy. 
 pub fn add_postfabs_to_spawned_scene(
     spawned_scenes: Query<(Entity, &Handle<Scene>), Added<Handle<Scene>>>,
     fab_manager: Res<FabManager>,
@@ -46,23 +47,22 @@ pub fn handle_scene_postfabs(world: &mut World) {
         if !scene_spawner.instance_is_ready(**instance) {
             continue;
         }
-        
+
         root_entities.push(entity);
-        
+
         //Iterate over all of a postfabs pipe
         for pipe in postfab.pipes.iter() {
-            //Attempt to apply to any children
-            'child: for applicable_entity in children
-                .iter_descendants(entity)
-                .chain(std::iter::once(entity))
+            //Attempt to apply to the parent, then any children
+            'child: for applicable_entity in
+                std::iter::once(entity).chain(children.iter_descendants(entity))
             {
                 let Some(ent) = world.get_entity(applicable_entity) else {
                     warn!("Could not get entity for postfab, aborting postfab");
                     continue;
                 };
-                let pipe = pipe.clone();
+                
                 //Check if enity has required Name
-                if let Some(criteria) = pipe.with_name {
+                if let Some(criteria) = &pipe.with_name {
                     match ent.get::<Name>() {
                         Some(n) => {
                             if !criteria.eval(n) {
@@ -70,22 +70,21 @@ pub fn handle_scene_postfabs(world: &mut World) {
                             }
                         }
                         None => {
-                            info!("Name not found");
                             continue 'child;
                         }
                     }
                 }
 
                 //Check if entity has required components
-                for t in pipe.with_components {
-                    if !ent.contains_type_id(t) {
+                for t in &pipe.with_components {
+                    if !ent.contains_type_id(*t) {
                         continue 'child;
                     }
                 }
 
                 //Check if entity does not have components
-                for t in pipe.without_components {
-                    if ent.contains_type_id(t) {
+                for t in &pipe.without_components {
+                    if ent.contains_type_id(*t) {
                         continue 'child;
                     }
                 }
@@ -95,11 +94,13 @@ pub fn handle_scene_postfabs(world: &mut World) {
             }
         }
     }
-    
-    for ent in root_entities{
+
+    //Remove the postfab for the parent so it's not processed again
+    for ent in root_entities {
         world.entity_mut(ent).remove::<PostFab>();
     }
-    
+
+    // Run the system with the entity as the input
     for (system, ent) in pipes_to_run {
         if let Err(e) = world.run_system_with_input(system, ent) {
             error!("Error running system for postfab pipe!\n {}", e);
@@ -108,21 +109,18 @@ pub fn handle_scene_postfabs(world: &mut World) {
 }
 
 /// Postfabs are used to modify a scene every time it's spawned
-/// You may use these to pass in contextual information information at the time
+/// You may use these to read component data and attach contextual components to entities
 /// of spawning such as changing the material color based on health / faction etc.
 /// These run every time you spawn the PostFab
 #[derive(Clone, Component)]
 pub struct PostFab {
-    pub scene: PostFabTarget,
+    pub scene: FabTarget,
     pub pipes: Vec<PostfabPipe>,
 }
 
-#[derive(Clone)]
-pub enum PostFabTarget {
-    Scene(Handle<Scene>),
-    Gltf(Handle<Gltf>),
-}
-
+/// An individual element of a postfab. Postfabs contain an ordered collection of pipes that run 
+/// in order. The pipe has various filtering functions etc. to make this easier. These filters could/should
+/// be copied over to the prefab behavior as well
 #[derive(Clone)]
 pub struct PostfabPipe {
     pub system: SystemId<Entity, ()>,
@@ -131,6 +129,7 @@ pub struct PostfabPipe {
     pub with_name: Option<NameCriteria>,
 }
 
+/// Name component criteria for determining whether a pipe should run on a given entity
 #[derive(Clone)]
 pub enum NameCriteria {
     Equals(String),

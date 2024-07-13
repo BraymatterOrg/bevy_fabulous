@@ -3,9 +3,9 @@ use std::f32::consts::PI;
 use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
 use bevy_fabulous::{
     materials::{FabulousMaterialsPlugin, NamedMaterialIndex},
-    postfab::{NameCriteria, PostFab, PostFabTarget, PostfabPipe},
+    postfab::{NameCriteria, PostFab, PostfabPipe},
     prefab::{Prefab, PrefabPipe},
-    FabManager, FabulousPlugin,
+    FabManager, FabulousPlugin, FabTarget,
 };
 
 fn main() {
@@ -81,10 +81,10 @@ fn load_minion_asset(
     mut mats: ResMut<Assets<StandardMaterial>>,
     mut mat_index: ResMut<NamedMaterialIndex<StandardMaterial, StandardMaterial>>,
 ) {
-    let scene_handle = asset_server.load("earthminion.glb");
+    let gltf_handle = asset_server.load("earthminion.glb");
 
     cmds.insert_resource(ExampleResource {
-        asset_scene: scene_handle.clone(),
+        asset_scene: gltf_handle.clone(),
     });
 
     //Create and register new material to be swapped out
@@ -96,7 +96,7 @@ fn load_minion_asset(
     mat_index.register_main_mat("EarthMana", mats.add(earth_mana));
 
     fabs.register_prefab(
-        Prefab::new("earthminion.glb#Scene0")
+        Prefab::new(FabTarget::Gltf(gltf_handle.clone()))
             .with_system(inner_gear_rotate)
             .with_pipe(RotateHeadPipe {
                 rotation_rate: PI / 10.0,
@@ -104,7 +104,7 @@ fn load_minion_asset(
     );
 
     fabs.register_postfab(PostFab {
-        scene: PostFabTarget::Gltf(scene_handle),
+        scene: FabTarget::Gltf(gltf_handle),
         pipes: vec![PostfabPipe {
             system: cmds.register_one_shot_system(add_scalar_to_orbiters),
             with_components: vec![],
@@ -250,7 +250,8 @@ pub struct ScaleOverTime {
 
 fn scale(mut scaler: Query<(&mut Transform, &ScaleOverTime)>, time: Res<Time>) {
     for (mut tsf, scaler) in scaler.iter_mut() {
-        tsf.scale =
-            scaler.base_scale + (time.elapsed_seconds() * scaler.frequency).sin().abs() * (scaler.factor - scaler.base_scale);
+        tsf.scale = scaler.base_scale
+            + (time.elapsed_seconds() * scaler.frequency).sin().abs()
+                * (scaler.factor - scaler.base_scale);
     }
 }
