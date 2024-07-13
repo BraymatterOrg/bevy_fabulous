@@ -6,12 +6,14 @@ use bevy::{
     prelude::*,
     utils::HashMap,
 };
-use postfab::{add_postfabs_to_spawned_scene, handle_scene_postfabs, PostFab};
-use prefab::{apply_pipes_to_loaded_scene, Prefab};
 
 pub mod materials;
 pub mod postfab;
 pub mod prefab;
+
+pub use materials::*;
+pub use postfab::*;
+pub use prefab::*;
 
 pub struct FabulousPlugin;
 

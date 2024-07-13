@@ -6,5 +6,9 @@ edition = "2021"
 [[example]]
 name="example"
 
+[lib]
+name = "bevy_fabulous"
+path = "src/lib.rs"
+
 [dependencies]
 bevy="0.14"

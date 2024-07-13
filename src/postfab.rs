@@ -61,16 +61,15 @@ pub fn handle_scene_postfabs(world: &mut World) {
                     continue;
                 };
                 //Check if enity has required Name
-                if let Some(criteria) = &pipe.with_name {
-                    match ent.get::<Name>() {
-                        Some(n) => {
-                            if !criteria.eval(n) {
-                                continue 'child;
-                            }
-                        }
-                        None => {
+
+                match ent.get::<Name>() {
+                    Some(n) => {
+                        if !pipe.name_criteria.eval(n) {
                             continue 'child;
                         }
+                    }
+                    None => {
+                        continue 'child;
                     }
                 }
 
@@ -123,14 +122,75 @@ pub struct PostFab {
 #[derive(Clone)]
 pub struct PostfabPipe {
     pub system: SystemId<Entity, ()>,
+    /// Only apply pipe to entities with the following components
     pub with_components: Vec<TypeId>,
+    /// Only apply pipe to entities without the following components
     pub without_components: Vec<TypeId>,
-    pub with_name: Option<NameCriteria>,
+    /// Only apply pipe to entities matching name criteria
+    pub name_criteria: NameCriteria,
+    /// Only apply pipe to the scene root entity
+    pub root_only: bool,
+}
+
+impl PostfabPipe {
+    /// Get a new pipeline builder
+    pub fn new(system: SystemId<Entity, ()>) -> Self {
+        Self {
+            system,
+            with_components: vec![],
+            without_components: vec![],
+            name_criteria: NameCriteria::Any,
+            root_only: false,
+        }
+    }
+
+    /// Apply only to entities with the following components
+    pub fn with_components(mut self, components: Vec<TypeId>) -> Self {
+        self.with_components = components;
+        self
+    }
+
+    /// Apply only to entities without the following components
+    pub fn without_components(mut self, components: Vec<TypeId>) -> Self {
+        self.without_components = components;
+        self
+    }
+
+    /// Apply only to entities in the scene/root with a name equal to the input
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name_criteria = NameCriteria::Equals(name.into());
+        self
+    }
+
+    /// Apply only to entities in the scene/root with a name containing the input
+    pub fn name_contains(mut self, name: impl Into<String>) -> Self {
+        self.name_criteria = NameCriteria::Contains(name.into());
+        self
+    }
+
+    /// Apply only to entities in the scene/root with a name starting with the input
+    pub fn name_starts_with(mut self, name: impl Into<String>) -> Self {
+        self.name_criteria = NameCriteria::StartsWith(name.into());
+        self
+    }
+
+    /// Apply only to entities in the scene/root with a name ending with the input
+    pub fn name_ends_with(mut self, name: impl Into<String>) -> Self {
+        self.name_criteria = NameCriteria::EndsWith(name.into());
+        self
+    }
+    
+    /// Whether this applies to the scene root only
+    pub fn root_only(mut self) -> Self {
+        self.root_only = true;
+        self
+    }
 }
 
 /// Name component criteria for determining whether a pipe should run on a given entity
 #[derive(Clone)]
 pub enum NameCriteria {
+    Any,
     Equals(String),
     Contains(String),
     StartsWith(String),
@@ -140,6 +200,7 @@ pub enum NameCriteria {
 impl NameCriteria {
     pub fn eval(&self, name: &Name) -> bool {
         match self {
+            NameCriteria::Any => true,
             NameCriteria::Equals(c) => c == &name.to_string(),
             NameCriteria::Contains(c) => name.to_string().contains(c.as_str()),
             NameCriteria::StartsWith(c) => name.starts_with(c.as_str()),

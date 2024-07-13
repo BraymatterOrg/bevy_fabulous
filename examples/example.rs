@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
 use bevy_fabulous::{
     materials::{FabulousMaterialsPlugin, NamedMaterialIndex},
-    postfab::{NameCriteria, PostFab, PostfabPipe},
+    postfab::{PostFab, PostfabPipe},
     prefab::{Prefab, PrefabPipe},
     FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt,
 };
@@ -102,12 +102,11 @@ fn load_minion_asset(
 
     fabs.register_postfab(PostFab {
         scene: FabTarget::Gltf(gltf_handle),
-        pipes: vec![PostfabPipe {
-            system: cmds.register_one_shot_system(add_scalar_to_orbiters),
-            with_components: vec![],
-            without_components: vec![],
-            with_name: Some(NameCriteria::Contains("Orbiter".to_string())),
-        }],
+        pipes: vec![
+            PostfabPipe::new(cmds.register_one_shot_system(add_scalar_to_orbiters))
+                .name_contains("Orbiter")
+                .root_only(),
+        ],
     })
 }
 
