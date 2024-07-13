@@ -1,6 +1,6 @@
 use bevy::{ecs::system::BoxedSystem, prelude::*};
 
-use crate::{FabManager, PostFabTarget};
+use crate::{FabManager, FabTarget};
 
 /// Apply pipes to  the loaded Scene
 pub fn apply_pipes_to_loaded_scene(
@@ -44,7 +44,7 @@ pub fn apply_pipes_to_loaded_scene(
 /// Applies ScenePipes to the loaded scene `World`
 pub struct Prefab {
     /// The path to the asset on the filesystem
-    pub target: PostFabTarget,
+    pub target: FabTarget,
 
     /// Pipes to run on load
     pub pipeline: Vec<Box<dyn PrefabPipe + Send + Sync>>,
@@ -52,9 +52,9 @@ pub struct Prefab {
 
 impl Prefab {
     /// Create a new, prefab based on a scene with no modifications
-    pub fn new(target: PostFabTarget) -> Self {
+    pub fn new(target: impl Into<FabTarget>) -> Self {
         Self {
-            target,
+            target: target.into(),
             pipeline: vec![],
         }
     }
@@ -107,3 +107,4 @@ impl<T: FnMut() -> BoxedSystem + Send + Sync> PrefabPipe for T {
         world.flush();
     }
 }
+

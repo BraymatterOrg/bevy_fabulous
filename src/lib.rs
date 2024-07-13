@@ -36,38 +36,26 @@ pub struct FabManager {
 impl FabManager {
     pub fn register_prefab(&mut self, prefab: Prefab) {
         match &prefab.target{
-            PostFabTarget::Scene(scene) => self.prefabs.insert(scene.clone(), prefab),
-            PostFabTarget::Gltf(gltf) => self.prefab_gltfs.insert(gltf.clone(), prefab),
+            FabTarget::Scene(scene) => self.prefabs.insert(scene.clone(), prefab),
+            FabTarget::Gltf(gltf) => self.prefab_gltfs.insert(gltf.clone(), prefab),
         };
     }
 
     pub fn prefab(&self, scene: &Handle<Scene>) -> Option<&Prefab> {
-        let prefab = self.prefabs.iter().find(|(sourcepath, _fab)| {
-            if scene == *sourcepath {
-                return true;
-            }
-
-            false
-        });
+        let prefab = self.prefabs.get(scene);
 
         if let Some(p) = prefab {
-            return Some(p.1);
+            return Some(p);
         }
 
         None
     }
 
     pub fn prefab_mut(&mut self, scene: &Handle<Scene>) -> Option<&mut Prefab> {
-        let prefab = self.prefabs.iter_mut().find(|(sourcepath, _fab)| {
-            if scene == *sourcepath {
-                return true;
-            }
-
-            false
-        });
+        let prefab = self.prefabs.get_mut(scene);
 
         if let Some(p) = prefab {
-            return Some(p.1);
+            return Some(p);
         }
 
         None
@@ -75,11 +63,11 @@ impl FabManager {
 
     pub fn register_postfab(&mut self, postfab: PostFab) {
         match &postfab.scene {
-            PostFabTarget::Scene(scene) => {
+            FabTarget::Scene(scene) => {
                 self.postfabs.insert(scene.clone(), postfab);
             }
             
-            PostFabTarget::Gltf(gltf) => {
+            FabTarget::Gltf(gltf) => {
                 self.postfab_gltfs.insert(gltf.clone(), postfab);
             }
         }
@@ -93,9 +81,21 @@ pub struct PostFabRegistrationParams<'w> {
 }
 
 #[derive(Clone)]
-pub enum PostFabTarget {
+pub enum FabTarget {
     Scene(Handle<Scene>),
     Gltf(Handle<Gltf>),
+}
+
+impl From<Handle<Gltf>> for FabTarget{
+    fn from(value: Handle<Gltf>) -> Self {
+        Self::Gltf(value)
+    }
+}
+
+impl From<Handle<Scene>> for FabTarget{
+    fn from(value: Handle<Scene>) -> Self {
+        Self::Scene(value)
+    }
 }
 
 fn convert_gltffabs_to_scenefabs(

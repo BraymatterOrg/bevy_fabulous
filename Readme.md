@@ -1,21 +1,21 @@
 # Bevy Fabulous
 
-> I want to tell you a story. You order some furniture online. It arrives in a box and the delivery man rings the doorbell. 
-Before you're able to get to the door a goblin opens the box, assembles the furniture and puts it back in the box. Fabulous. 
+> I want to tell you a story. You order some furniture online. It arrives in a box and the delivery man rings the doorbell.
+> Before you're able to get to the door a goblin opens the box, assembles the furniture and puts it back in the box. Fabulous.
 
 ## Overview
 
 Bevy fabulous aims to provide a framework for encapsulating and coupling a loaded GLTF to it's gameplay components without
-using heavy tooling, or opinionated plugins. 
+using heavy tooling, or opinionated plugins.
 
 Bevy Fabulous provides to mechanisms to enrich a GLTF loaded Scene: **Prefabs** and **PostFabs**
 
 ## Prefabs
 
 Prefabs modify the loaded scene world directly, applying gameplay components to entities in the Scene world directly. This only
-needs to run once as the components are then part of the Scene, so any subsequent spawns of `SceneBundle` will have the components. 
+needs to run once as the components are then part of the Scene, so any subsequent spawns of `SceneBundle` will have the components.
 
-Prefabs contain a path to the asset, which is used as the key to a `HashMap<String, Prefab>` in the `FabManager` resource. 
+Prefabs contain a path to the asset, which is used as the key to a `HashMap<String, Prefab>` in the `FabManager` resource.
 
 Prefabs are a wrapper around a Vec of PrefabPipe trait objects, and run in the order they are inserted:
 
@@ -23,11 +23,12 @@ Prefabs are a wrapper around a Vec of PrefabPipe trait objects, and run in the o
 /// Applies ScenePipes to the loaded scene `World`
 pub struct Prefab {
     /// The path to the asset on the filesystem
-    pub path: String,
+    pub target: FabTarget,
 
     /// Pipes to run on load
     pub pipeline: Vec<Box<dyn PrefabPipe + Send + Sync>>,
 }
+
 ```
 
 `PrefabPipe` can end up looking a lot like a Commands:
@@ -83,12 +84,12 @@ _`PrefabPipe` also has a blanket implementation for BoxedSystem! Allowing you to
 
 ```rs
 //In Some Startup/Loaded System
-//--- 
+//---
 //Register to the `FabManager`
 fabs.register_prefab(
-        Prefab::new("earthminion.glb#Scene0")
-            .with_system(inner_gear_rotate)
-    );
+    Prefab::new(FabTarget::Gltf(gltf_handle.clone()))
+        .with_system(inner_gear_rotate)
+);
 //---
 
 //Define a prefab pipe as a system
@@ -123,24 +124,60 @@ fn inner_gear_rotate(entities: Query<(Entity, &Name)>, mut cmds: Commands) {
 
 ## Postfabs
 
-Postfabs are run everytime a specific Scene is spawned. They run on entities _after_ they are spawned, and do not modify
-the source Scene. 
+Postfabs are run every time a specific Scene is spawned. They run on entities _after_ they are spawned, and do not modify
+the source Scene.
 
 - They can be used to transform a spawned scene based on contextual information in an ergonomic way.
 - They can be used to replace materials / assets from the Scene with the 'Hydrated' assets from the main Bevy world. E.g. `StandardMaterial`
 - If possible, use a Prefab as the one-time cost is preferable to running logic/queries every time the Scene is spawned
 
-Postfabs work by using a `Component::on_add` hook for `PostFab`. This means in addition to a Scene/Bundle you need to attach a PostFab
-to your spawned `Entity`. 
-
-`Postfabs` are stored on the `FabManager` as a `HashMap<Handle<Scene>, PostFab>` and can be fetched for a given `Scene`
-
-Like `Prefabs`, `PostFabs` are comprised of a Vec of `PostFabPipe` that runs in order of insertion:
+Postfabs can be registered with a `FabTarget` which provides for the user to use either a `Handle<Scene>` directly, or a `Handle<Gltf>`, which will register the postfab
+with the first scene in the gltf.
 
 ```rs
+#[derive(Clone, Component)]
 pub struct PostFab {
-    pub scene: Handle<Scene>,
-    pub pipes: Vec<Box<dyn PostfabPipe + Send + Sync>>,
+    pub scene: FabTarget,
+    pub pipes: Vec<PostfabPipe>,
 }
 ```
 
+Like `Prefabs,`, `Postfabs` are composed of a FabTarget and a series of pipes applied in order. The `PostfabPipe` has som more advanced filtering options to specify
+whether a pipe should run on a given entity:
+
+```rs
+#[derive(Clone)]
+pub struct PostfabPipe {
+    pub system: SystemId<Entity, ()>,
+    pub with_components: Vec<TypeId>,
+    pub without_components: Vec<TypeId>,
+    pub with_name: Option<NameCriteria>,
+}
+
+/// Name component criteria for determining whether a pipe should run on a given entity
+#[derive(Clone)]
+pub enum NameCriteria {
+    Equals(String),
+    Contains(String),
+    StartsWith(String),
+    EndsWith(String),
+}
+```
+
+## Material Overrides
+
+Material overrides are used to automatically replace material handles on entity with another. This is useful for replacing the standard mat loaded as part of
+a scene/gltf with something custom. The name is fetched from the GLTF asset's `NamedMaterials` map. At time of writing the user needs to load the gltf asset directly
+so it's alive and available at the time the `FabulousMaterialsPlugin` asset watcher runs. This means Scenes loaded with "myAsset.gltf#Scene0" or
+`GltfAssetLabel::Scene(0)` may not work as intended.
+
+```rs
+
+//Create and register new material to be swapped out
+let earth_mana = StandardMaterial {
+    emissive: (palettes::css::LIMEGREEN * 2.0).into(),
+    ..default()
+};
+
+mat_index.register_main_mat("EarthMana", mats.add(earth_mana));
+```

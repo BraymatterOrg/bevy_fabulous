@@ -5,7 +5,7 @@ use bevy_fabulous::{
     materials::{FabulousMaterialsPlugin, NamedMaterialIndex},
     postfab::{NameCriteria, PostFab, PostfabPipe},
     prefab::{Prefab, PrefabPipe},
-    FabManager, FabulousPlugin, PostFabTarget,
+    FabManager, FabulousPlugin, FabTarget,
 };
 
 fn main() {
@@ -96,7 +96,7 @@ fn load_minion_asset(
     mat_index.register_main_mat("EarthMana", mats.add(earth_mana));
 
     fabs.register_prefab(
-        Prefab::new(PostFabTarget::Gltf(gltf_handle.clone()))
+        Prefab::new(FabTarget::Gltf(gltf_handle.clone()))
             .with_system(inner_gear_rotate)
             .with_pipe(RotateHeadPipe {
                 rotation_rate: PI / 10.0,
@@ -104,7 +104,7 @@ fn load_minion_asset(
     );
 
     fabs.register_postfab(PostFab {
-        scene: PostFabTarget::Gltf(gltf_handle),
+        scene: FabTarget::Gltf(gltf_handle),
         pipes: vec![PostfabPipe {
             system: cmds.register_one_shot_system(add_scalar_to_orbiters),
             with_components: vec![],
