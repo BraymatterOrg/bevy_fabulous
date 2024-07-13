@@ -27,7 +27,10 @@ pub fn apply_pipes_to_loaded_scene(
             continue;
         };
 
-        debug!("Found prefab definition for loaded asset: {:?}", scene_handle);
+        debug!(
+            "Found prefab definition for loaded asset: {:?}",
+            scene_handle
+        );
 
         let Some(scene) = scenes.get_mut(scene_handle.id()) else {
             warn!("Could not get scene from gltf from Asset<Scene>");

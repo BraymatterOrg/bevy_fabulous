@@ -1,4 +1,11 @@
-use bevy::{ecs::system::SystemParam, prelude::*, utils::HashMap};
+use bevy::{
+    ecs::{
+        system::{SystemParam, SystemState},
+        world::Command,
+    },
+    prelude::*,
+    utils::HashMap,
+};
 use postfab::{add_postfabs_to_spawned_scene, handle_scene_postfabs, PostFab};
 use prefab::{apply_pipes_to_loaded_scene, Prefab};
 
@@ -35,7 +42,7 @@ pub struct FabManager {
 
 impl FabManager {
     pub fn register_prefab(&mut self, prefab: Prefab) {
-        match &prefab.target{
+        match &prefab.target {
             FabTarget::Scene(scene) => self.prefabs.insert(scene.clone(), prefab),
             FabTarget::Gltf(gltf) => self.prefab_gltfs.insert(gltf.clone(), prefab),
         };
@@ -66,7 +73,7 @@ impl FabManager {
             FabTarget::Scene(scene) => {
                 self.postfabs.insert(scene.clone(), postfab);
             }
-            
+
             FabTarget::Gltf(gltf) => {
                 self.postfab_gltfs.insert(gltf.clone(), postfab);
             }
@@ -86,13 +93,13 @@ pub enum FabTarget {
     Gltf(Handle<Gltf>),
 }
 
-impl From<Handle<Gltf>> for FabTarget{
+impl From<Handle<Gltf>> for FabTarget {
     fn from(value: Handle<Gltf>) -> Self {
         Self::Gltf(value)
     }
 }
 
-impl From<Handle<Scene>> for FabTarget{
+impl From<Handle<Scene>> for FabTarget {
     fn from(value: Handle<Scene>) -> Self {
         Self::Scene(value)
     }
@@ -105,19 +112,19 @@ fn convert_gltffabs_to_scenefabs(
 ) {
     let mut loaded_postfabs = vec![];
     let mut loaded_prefabs = vec![];
-    
+
     for (gltf_handle, _fab) in fabs.postfab_gltfs.iter() {
         if asset_server.is_loaded_with_dependencies(gltf_handle) {
             loaded_postfabs.push(gltf_handle.clone());
         }
     }
 
-    for (gltf_handle, _fab) in fabs.prefab_gltfs.iter(){
-        if asset_server.is_loaded_with_dependencies(gltf_handle){
+    for (gltf_handle, _fab) in fabs.prefab_gltfs.iter() {
+        if asset_server.is_loaded_with_dependencies(gltf_handle) {
             loaded_prefabs.push(gltf_handle.clone())
         }
     }
-    
+
     for handle in loaded_postfabs {
         let Some(fab) = fabs.postfab_gltfs.remove(&handle) else {
             warn!("Found gltf postfab loaded, but could not find it in fabs.postfab map!");
@@ -156,5 +163,119 @@ fn convert_gltffabs_to_scenefabs(
 
         debug!("Converting GLTF Postfab To Scene!");
         fabs.prefabs.insert(scene.clone(), fab);
+    }
+}
+
+#[derive(Default)]
+pub struct GltfScene {
+    pub handle: Handle<Gltf>,
+    pub scene_idx: usize,
+    pub location: Transform,
+}
+
+impl GltfScene {
+    pub fn new(gltf: Handle<Gltf>) -> Self {
+        Self {
+            handle: gltf,
+            ..default()
+        }
+    }
+
+    pub fn with_bundle<B: Bundle>(self, bundle: B) -> SpawnGltfScene<B> {
+        SpawnGltfScene {
+            bundle: Some(bundle),
+            gltf: self.handle,
+            scene_idx: self.scene_idx,
+            location: self.location,
+        }
+    }
+
+    pub fn build(self) -> SpawnGltfScene<()> {
+        SpawnGltfScene {
+            bundle: None,
+            gltf: self.handle,
+            scene_idx: self.scene_idx,
+            location: self.location,
+        }
+    }
+
+    pub fn with_scene(self, scene: usize) -> Self {
+        Self {
+            scene_idx: scene,
+            ..self
+        }
+    }
+
+    pub fn at_location(mut self, t: Transform) -> Self {
+        self.location = t;
+        self
+    }
+}
+
+pub struct SpawnGltfScene<B: Bundle> {
+    pub gltf: Handle<Gltf>,
+    pub scene_idx: usize,
+    pub location: Transform,
+    pub bundle: Option<B>,
+}
+
+impl<B: Bundle> SpawnGltfScene<B> {
+    pub fn with_bundle(mut self, bundle: B) -> Self {
+        self.bundle = Some(bundle);
+        self
+    }
+
+    pub fn with_scene(self, scene: usize) -> Self {
+        Self {
+            scene_idx: scene,
+            ..self
+        }
+    }
+
+    pub fn at_location(mut self, t: Transform) -> Self {
+        self.location = t;
+        self
+    }
+}
+
+impl<B: Bundle> Command for SpawnGltfScene<B> {
+    fn apply(self, world: &mut World) {
+        let mut sys_state = SystemState::<(Res<Assets<Gltf>>, Commands)>::new(world);
+        let (gltfs, mut cmds) = sys_state.get(world);
+
+        let Some(gltf) = gltfs.get(&self.gltf) else {
+            warn!("Could not get GLTF for SpawnGltfScene");
+            return;
+        };
+
+        let Some(scene) = gltf.scenes.get(self.scene_idx) else {
+            warn!(
+                "Could not find scene at index {} to spawn gltf scene",
+                self.scene_idx
+            );
+            return;
+        };
+
+        let mut spawned_scene = cmds.spawn((SceneBundle {
+            scene: scene.clone(),
+            transform: self.location,
+            ..default()
+        },));
+
+        if let Some(bundle) = self.bundle {
+            spawned_scene.insert(bundle);
+        }
+
+        sys_state.apply(world);
+    }
+}
+
+pub trait SpawnGltfCmdExt {
+    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T);
+}
+
+impl<'w, 's> SpawnGltfCmdExt for Commands<'w, 's> {
+    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) {
+        self.add(cmd.into());
     }
 }

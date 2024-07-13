@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use bevy::{prelude::*, utils::HashMap};
 
-/// Handles automatically swapping out materials with a specific name from a GLTF / Scene with a specific material. 
-/// If you're using the StandardMaterial you can probably fiddle with the material in blender to get what you want, 
-/// but if you're using a custom Material, or some particularly complicated StandardMaterials this gives provides 
+/// Handles automatically swapping out materials with a specific name from a GLTF / Scene with a specific material.
+/// If you're using the StandardMaterial you can probably fiddle with the material in blender to get what you want,
+/// but if you're using a custom Material, or some particularly complicated StandardMaterials this gives provides
 /// for a way to swap materials out as desired
 #[derive(Default)]
 pub struct FabulousMaterialsPlugin<T: Material> {
@@ -34,11 +34,11 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
             }
         }
     }
-    
+
     /// Watch asset_loaded events for GLTF's to be loaded, if they contained named materials this will
     /// check whether they should be overriden
     /// Note: When loading a Scene Asset directly, it seems as though the GLTF is discarded after it is loaded.
-    /// This system needs the GLTF asset as that's what contains the HashMap<MaterialName, Handle<StandardMaterial>> 
+    /// This system needs the GLTF asset as that's what contains the HashMap<MaterialName, Handle<StandardMaterial>>
     fn asset_watcher(
         mut asset_events: EventReader<AssetEvent<Gltf>>,
         mut mat_registry: ResMut<NamedMaterialIndex<T, StandardMaterial>>,
@@ -86,7 +86,7 @@ impl<T: Material, G: Material> NamedMaterialIndex<T, G> {
             materials_to_swap: HashMap::new(),
         }
     }
-    
+
     /// Register a new main material, materials loaded from GLTF's (Really anywhere) will be swapped out for the main material
     pub fn register_main_mat(&mut self, name: impl Into<String>, mat: Handle<T>) {
         self.materials_to_swap.insert(name.into(), (mat, vec![]));
@@ -102,7 +102,7 @@ impl<T: Material, G: Material> NamedMaterialIndex<T, G> {
         let Some((_master, swaps)) = self.materials_to_swap.get_mut(&n) else {
             return Err("No Master Material specified for name: {}");
         };
-        
+
         //Clone weak so just having this material in the array won't keep it alive / held if it's not used anywhere else
         swaps.push(mat.clone_weak());
 
@@ -119,7 +119,7 @@ impl<T: Material, G: Material> NamedMaterialIndex<T, G> {
 
         None
     }
-    
+
     /// Returns whether a material should be swapped / overriden with a main material
     pub fn contains_override(&self, name: String) -> bool {
         self.materials_to_swap.contains_key(&name)

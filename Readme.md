@@ -183,3 +183,14 @@ let earth_mana = StandardMaterial {
 
 mat_index.register_main_mat("EarthMana", mats.add(earth_mana));
 ```
+
+### Spawning Gltf Scenes
+Because the Named Material requires that a GLTF scene be available at the time the scene asset is loaded, it's best
+to load the Gltf instead of the Scene with in it directly. To make this a easier to deal with this crate provides the `SpawnGltfScene` command and some helpers. You can spawn a specific scene from a GLTF like so:
+
+```rs
+    // Spawn Minion at Default location
+    cmds.spawn_gltf(GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion")));
+```
+
+GltfScene also provides `at_location(Transform)`, `with_scene(usize)`, and `build()` for specifying the transform, which scene in the gltf, and spawning a scene without any additional components on the scene root
