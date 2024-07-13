@@ -9,9 +9,9 @@ use bevy::{
 use crate::{FabManager, FabTarget};
 
 /// Whenever a scene handle is added to an entity consult the fab manager
-/// and add a postfab if found. Postfabs are 'read-only' and can probably be 
+/// and add a postfab if found. Postfabs are 'read-only' and can probably be
 /// replaced with a reference/HashMap lookup so we don't have to worry about the performance of
-/// a copy. 
+/// a copy.
 pub fn add_postfabs_to_spawned_scene(
     spawned_scenes: Query<(Entity, &Handle<Scene>), Added<Handle<Scene>>>,
     fab_manager: Res<FabManager>,
@@ -60,7 +60,7 @@ pub fn handle_scene_postfabs(world: &mut World) {
                     warn!("Could not get entity for postfab, aborting postfab");
                     continue;
                 };
-                
+
                 //Check if enity has required Name
                 if let Some(criteria) = &pipe.with_name {
                     match ent.get::<Name>() {
@@ -118,7 +118,7 @@ pub struct PostFab {
     pub pipes: Vec<PostfabPipe>,
 }
 
-/// An individual element of a postfab. Postfabs contain an ordered collection of pipes that run 
+/// An individual element of a postfab. Postfabs contain an ordered collection of pipes that run
 /// in order. The pipe has various filtering functions etc. to make this easier. These filters could/should
 /// be copied over to the prefab behavior as well
 #[derive(Clone)]

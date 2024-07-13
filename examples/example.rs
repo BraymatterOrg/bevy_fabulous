@@ -5,7 +5,7 @@ use bevy_fabulous::{
     materials::{FabulousMaterialsPlugin, NamedMaterialIndex},
     postfab::{NameCriteria, PostFab, PostfabPipe},
     prefab::{Prefab, PrefabPipe},
-    FabManager, FabulousPlugin, FabTarget,
+    FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt,
 };
 
 fn main() {
@@ -33,7 +33,7 @@ fn main() {
     app.run();
 }
 
-fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>, gltfs: Res<Assets<Gltf>>) {
+fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>,) {
     //Spawn Camera
     cmds.spawn((
         Camera3dBundle {
@@ -50,14 +50,11 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>, gltfs: Res<Assets<G
     ));
 
     info!("Spawning Minion");
-    //Spawn Minion
-    let scene = gltfs.get(ex.asset_scene.id()).unwrap().scenes[0].clone();
-    cmds.spawn((
-        SceneBundle { scene, ..default() },
-        Name::new("Minion Scene"),
-    ));
 
-    //Shine a little light on me
+    // Spawn Minion
+    cmds.spawn_gltf(GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion")));
+
+    // Shine a little light on me
     cmds.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             shadows_enabled: true,
