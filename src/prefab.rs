@@ -110,3 +110,4 @@ impl<T: FnMut() -> BoxedSystem + Send + Sync> PrefabPipe for T {
         world.flush();
     }
 }
+

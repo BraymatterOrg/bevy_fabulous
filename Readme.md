@@ -3,7 +3,7 @@
 > I want to tell you a story. You order some furniture online. It arrives in a box and the delivery man rings the doorbell.
 > Before you're able to get to the door a goblin opens the box, assembles the furniture and puts it back in the box. Fabulous.
 
-https://github.com/user-attachments/assets/30e7c37a-1a36-423e-8f92-9298ac882af6
+https://github.com/user-attachments/assets/592b0c02-baa8-4e93-a0c7-7d6627ef6ade
 
 ## Overview
 
@@ -30,6 +30,7 @@ pub struct Prefab {
     /// Pipes to run on load
     pub pipeline: Vec<Box<dyn PrefabPipe + Send + Sync>>,
 }
+
 ```
 
 `PrefabPipe` can end up looking a lot like a Commands:

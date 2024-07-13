@@ -33,7 +33,7 @@ fn main() {
     app.run();
 }
 
-fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>,) {
+fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
     //Spawn Camera
     cmds.spawn((
         Camera3dBundle {
