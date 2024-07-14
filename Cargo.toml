@@ -1,6 +1,6 @@
 [package]
 name = "bevy_fabulous"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Cayle Bray"]
 description = "A Bevy plugin for enriching spawned GLTF scenes with gameplay components / assets"
@@ -13,6 +13,10 @@ homepage = "https://github.com/BraymatterOrg/bevy_fabulous"
 
 [[example]]
 name="example"
+
+[lib]
+name = "bevy_fabulous"
+path = "src/lib.rs"
 
 [dependencies]
 bevy="0.14"

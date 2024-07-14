@@ -1,6 +1,6 @@
 use bevy::{
     ecs::{
-        system::{SystemParam, SystemState},
+        system::{EntityCommand, EntityCommands, SystemParam, SystemState},
         world::Command,
     },
     prelude::*,
@@ -12,6 +12,7 @@ use prefab::{apply_pipes_to_loaded_scene, Prefab};
 pub mod materials;
 pub mod postfab;
 pub mod prefab;
+pub mod prelude;
 
 pub struct FabulousPlugin;
 
@@ -277,5 +278,54 @@ pub trait SpawnGltfCmdExt {
 impl<'w, 's> SpawnGltfCmdExt for Commands<'w, 's> {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) {
         self.add(cmd.into());
+    }
+}
+
+/// For trait objects of commands, to be used where generics cannot
+pub trait DynCommand: Send + Sync {
+    fn dyn_add(self: Box<Self>, cmd: &mut Commands);
+    fn dyn_apply(self: Box<Self>, world: &mut World);
+    fn dyn_clone(&self) -> Box<dyn DynCommand>;
+}
+
+impl<T: Command + Clone + Sync> DynCommand for T {
+    fn dyn_add(self: Box<Self>, cmd: &mut Commands) {
+        cmd.add(*self);
+    }
+
+    fn dyn_apply(self: Box<Self>, world: &mut World) {
+        self.apply(world);
+    }
+
+    fn dyn_clone(&self) -> Box<dyn DynCommand> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn DynCommand> {
+    fn clone(&self) -> Self {
+        self.dyn_clone()
+    }
+}
+
+/// For trait objects of commands, to be used where generics cannot
+pub trait DynEntityCommand: Send + Sync {
+    fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands);
+    fn dyn_clone(&self) -> Box<dyn DynEntityCommand>;
+}
+
+impl<T: EntityCommand + Clone + Sync> DynEntityCommand for T {
+    fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands) {
+        cmd.add(*self);
+    }
+
+    fn dyn_clone(&self) -> Box<dyn DynEntityCommand> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn DynEntityCommand> {
+    fn clone(&self) -> Self {
+        self.dyn_clone()
     }
 }
