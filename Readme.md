@@ -1,6 +1,6 @@
 # Bevy Fabulous
 
-https://github.com/user-attachments/assets/592b0c02-baa8-4e93-a0c7-7d6627ef6ade
+![BevyPrefabExample](https://github.com/user-attachments/assets/789af160-3a32-4ee1-a894-411b731c588e)
 
 ## Overview
 
