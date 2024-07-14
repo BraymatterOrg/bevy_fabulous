@@ -13,8 +13,9 @@ pub struct FabulousMaterialsPlugin<T: Material> {
 
 impl<T: Material> Plugin for FabulousMaterialsPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.insert_resource(NamedMaterialIndex::<T, StandardMaterial>::new());
-        app.add_systems(PreUpdate, (Self::replace_materials, Self::asset_watcher));
+        app.add_event::<SwapEvent>();
+        app.insert_resource(FabMaterialOverrides::<T, StandardMaterial>::new());
+        app.add_systems(PostUpdate, (Self::replace_materials, Self::asset_watcher));
     }
 }
 
@@ -24,7 +25,7 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
     fn replace_materials(
         mut cmds: Commands,
         added_mats: Query<(Entity, &Handle<StandardMaterial>), Added<Handle<StandardMaterial>>>,
-        index: Res<NamedMaterialIndex<T, StandardMaterial>>,
+        index: Res<FabMaterialOverrides<T, StandardMaterial>>,
     ) {
         for (mat_ent, handle) in added_mats.iter() {
             if let Some(mat_to_swap) = index.get_swap_mat(handle) {
@@ -41,7 +42,8 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
     /// This system needs the GLTF asset as that's what contains the HashMap<MaterialName, Handle<StandardMaterial>>
     fn asset_watcher(
         mut asset_events: EventReader<AssetEvent<Gltf>>,
-        mut mat_registry: ResMut<NamedMaterialIndex<T, StandardMaterial>>,
+        mut mat_registry: ResMut<FabMaterialOverrides<T, StandardMaterial>>,
+        mut events: EventWriter<SwapEvent>,
         gltfs: Res<Assets<Gltf>>,
     ) {
         for event in asset_events.read() {
@@ -52,16 +54,17 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
                         continue;
                     };
 
+                    //For every named material in the gltf
                     for (named, mat) in gltf.named_materials.iter() {
-                        debug!("Found Named Material: {}", named);
-                        if mat_registry.contains_override(named.to_string()) {
-                            if let Err(e) =
-                                mat_registry.register_swap_mat(named.to_string(), &mat.clone())
-                            {
-                                error!("Error registering new swap material: \n {}", e);
-                            } else {
-                                debug!("Registering Swap Mat!")
-                            }
+                        //Check if it contains an override, if it does register the handle so it's swappeg out
+                        let name = named.to_string();
+                        if mat_registry.contains_override(&name) {
+                            mat_registry.register_swap_mat(named.to_string(), &mat.clone());
+                            events.send(SwapEvent);
+                        } else {
+                            //If it doesn't, put it into the unprocessed materials HashMap
+                            //so it can be picked up when the user (eventually) registers their main material
+                            mat_registry.register_mat_for_processing(name, mat);
                         }
                     }
                 }
@@ -71,49 +74,78 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
     }
 }
 
+#[derive(Event)]
+pub struct SwapEvent;
+
 /// Used to track which material handles should be swapped for a 'main-material'
 /// Multiple materials can be swapped for the same main material
 #[derive(Resource)]
-pub struct NamedMaterialIndex<T: Material, G: Material> {
-    /// Contains a map of the material name, to a tuple of the final mat handle, and any materials that should be replaced by it
-    pub materials_to_swap: HashMap<String, (Handle<T>, Vec<Handle<G>>)>,
+pub struct FabMaterialOverrides<T: Material, G: Material> {
+    /// Contains a map of the material name, to any materials that should be replaced by it
+    pub swap_materials: HashMap<String, Vec<Handle<G>>>,
+    pub main_materials: HashMap<String, Handle<T>>,
+
+    /// Materials names that do/did not have an override when they were loaded
+    pub unprocessed_materials: HashMap<String, Vec<Handle<G>>>,
 }
 
-impl<T: Material, G: Material> NamedMaterialIndex<T, G> {
+impl<T: Material, G: Material> FabMaterialOverrides<T, G> {
     /// Creates a new, empty material index
     pub fn new() -> Self {
         Self {
-            materials_to_swap: HashMap::new(),
+            swap_materials: HashMap::new(),
+            main_materials: HashMap::new(),
+            unprocessed_materials: HashMap::new(),
         }
     }
 
     /// Register a new main material, materials loaded from GLTF's (Really anywhere) will be swapped out for the main material
     pub fn register_main_mat(&mut self, name: impl Into<String>, mat: Handle<T>) {
-        self.materials_to_swap.insert(name.into(), (mat, vec![]));
+        let n = name.into();
+        self.main_materials.insert(n.clone(), mat);
+
+        let Some(unprocessed_mats) = self.unprocessed_materials.remove(&n) else {
+            return;
+        };
+
+        for mat in unprocessed_mats {
+            self.register_swap_mat(&n, &mat);
+        }
     }
 
     /// Register a swap material. The material handle will be removed from the entity, and the main material handle will be added
-    pub fn register_swap_mat(
-        &mut self,
-        name: impl Into<String>,
-        mat: &Handle<G>,
-    ) -> Result<(), &str> {
+    pub fn register_swap_mat(&mut self, name: impl Into<String>, mat: &Handle<G>) {
         let n = name.into();
-        let Some((_master, swaps)) = self.materials_to_swap.get_mut(&n) else {
-            return Err("No Master Material specified for name: {}");
-        };
 
         //Clone weak so just having this material in the array won't keep it alive / held if it's not used anywhere else
-        swaps.push(mat.clone_weak());
-
-        Ok(())
+        if let Some(swaps) = self.swap_materials.get_mut(&n) {
+            swaps.push(mat.clone_weak());
+        } else {
+            self.swap_materials.insert(n, vec![mat.clone_weak()]);
+        }
     }
 
+    /// Register a swap material. The material handle will be removed from the entity, and the main material handle will be added
+    pub fn register_mat_for_processing(&mut self, name: impl Into<String>, mat: &Handle<G>) {
+        let n = name.into();
+
+        //Clone weak so just having this material in the array won't keep it alive / held if it's not used anywhere else
+        if let Some(swaps) = self.unprocessed_materials.get_mut(&n) {
+            swaps.push(mat.clone_weak());
+        } else {
+            self.unprocessed_materials.insert(n, vec![mat.clone_weak()]);
+        }
+    }
     /// Takes a potential swap material and checks if it is already in the registry
     pub fn get_swap_mat(&self, mat: &Handle<G>) -> Option<Handle<T>> {
-        for (_name, (main_mat, swaps)) in self.materials_to_swap.iter() {
+        for (name, swaps) in self.swap_materials.iter() {
             if swaps.contains(mat) {
-                return Some(main_mat.clone());
+                if let Some(main_mat) = self.main_materials.get(name) {
+                    return Some(main_mat.clone());
+                } else {
+                    warn!("Could not find main mat for swap mat with name: {}", name);
+                    return None;
+                }
             }
         }
 
@@ -121,7 +153,7 @@ impl<T: Material, G: Material> NamedMaterialIndex<T, G> {
     }
 
     /// Returns whether a material should be swapped / overriden with a main material
-    pub fn contains_override(&self, name: String) -> bool {
-        self.materials_to_swap.contains_key(&name)
+    pub fn contains_override(&self, name: &String) -> bool {
+        self.main_materials.contains_key(name)
     }
 }

@@ -6,7 +6,7 @@ use bevy::{
     scene::SceneInstance,
 };
 
-use crate::{FabManager, FabTarget};
+use crate::{DynCommand, DynEntityCommand, FabManager, FabTarget};
 
 /// Whenever a scene handle is added to an entity consult the fab manager
 /// and add a postfab if found. Postfabs are 'read-only' and can probably be
@@ -52,16 +52,21 @@ pub fn handle_scene_postfabs(world: &mut World) {
 
         //Iterate over all of a postfabs pipe
         for pipe in postfab.pipes.iter() {
+            let applicable_ents = match pipe.root_only {
+                true => vec![entity],
+                false => std::iter::once(entity)
+                    .chain(children.iter_descendants(entity))
+                    .collect(),
+            };
+
             //Attempt to apply to the parent, then any children
-            'child: for applicable_entity in
-                std::iter::once(entity).chain(children.iter_descendants(entity))
-            {
+            'child: for applicable_entity in applicable_ents {
                 let Some(ent) = world.get_entity(applicable_entity) else {
                     warn!("Could not get entity for postfab, aborting postfab");
                     continue;
                 };
-                //Check if enity has required Name
 
+                //Check if enity has required Name
                 match ent.get::<Name>() {
                     Some(n) => {
                         if !pipe.name_criteria.eval(n) {
@@ -88,7 +93,7 @@ pub fn handle_scene_postfabs(world: &mut World) {
                 }
 
                 //Run System
-                pipes_to_run.push((pipe.system, applicable_entity));
+                pipes_to_run.push((pipe.executor.clone(), applicable_entity));
             }
         }
     }
@@ -99,11 +104,28 @@ pub fn handle_scene_postfabs(world: &mut World) {
     }
 
     // Run the system with the entity as the input
-    for (system, ent) in pipes_to_run {
-        if let Err(e) = world.run_system_with_input(system, ent) {
-            error!("Error running system for postfab pipe!\n {}", e);
+    for (executor, ent) in pipes_to_run {
+        match executor {
+            RunType::System(system) => {
+                if let Err(e) = world.run_system_with_input(system, ent) {
+                    error!("Error running system for postfab pipe!\n {}", e);
+                }
+            }
+            RunType::Command(cmd) => {
+                cmd.dyn_add(&mut world.commands());
+            }
+            RunType::Entity(entcmd) => {
+                let mut world_cmds = world.commands();
+                let Some(mut entcmds) = world_cmds.get_entity(ent) else {
+                    error!("Could not get entity for entity command postfab");
+                    continue;
+                };
+
+                entcmd.dyn_add(&mut entcmds);
+            }
         }
     }
+    world.flush();
 }
 
 /// Postfabs are used to modify a scene every time it's spawned
@@ -116,12 +138,19 @@ pub struct PostFab {
     pub pipes: Vec<PostfabPipe>,
 }
 
+#[derive(Clone)]
+pub enum RunType {
+    System(SystemId<Entity>),
+    Entity(Box<dyn DynEntityCommand>),
+    Command(Box<dyn DynCommand>),
+}
+
 /// An individual element of a postfab. Postfabs contain an ordered collection of pipes that run
 /// in order. The pipe has various filtering functions etc. to make this easier. These filters could/should
 /// be copied over to the prefab behavior as well
 #[derive(Clone)]
 pub struct PostfabPipe {
-    pub system: SystemId<Entity, ()>,
+    pub executor: RunType,
     /// Only apply pipe to entities with the following components
     pub with_components: Vec<TypeId>,
     /// Only apply pipe to entities without the following components
@@ -133,10 +162,32 @@ pub struct PostfabPipe {
 }
 
 impl PostfabPipe {
-    /// Get a new pipeline builder
-    pub fn new(system: SystemId<Entity, ()>) -> Self {
+    /// Run the system if an entity matches these criteria
+    pub fn system(system: SystemId<Entity, ()>) -> Self {
         Self {
-            system,
+            executor: RunType::System(system),
+            with_components: vec![],
+            without_components: vec![],
+            name_criteria: NameCriteria::Any,
+            root_only: false,
+        }
+    }
+
+    /// Apply a command if it matches these criteria
+    pub fn cmd(cmd: impl DynCommand) -> Self {
+        Self {
+            executor: RunType::Command(cmd.dyn_clone()),
+            with_components: vec![],
+            without_components: vec![],
+            name_criteria: NameCriteria::Any,
+            root_only: false,
+        }
+    }
+
+    /// Apply an EntityCommand if it matches these criteria
+    pub fn entity(cmd: impl DynEntityCommand) -> Self {
+        Self {
+            executor: RunType::Entity(cmd.dyn_clone()),
             with_components: vec![],
             without_components: vec![],
             name_criteria: NameCriteria::Any,
@@ -179,7 +230,7 @@ impl PostfabPipe {
         self.name_criteria = NameCriteria::EndsWith(name.into());
         self
     }
-    
+
     /// Whether this applies to the scene root only
     pub fn root_only(mut self) -> Self {
         self.root_only = true;

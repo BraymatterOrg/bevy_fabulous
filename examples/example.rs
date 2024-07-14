@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
 use bevy_fabulous::{
-    materials::{FabulousMaterialsPlugin, NamedMaterialIndex},
+    materials::{FabMaterialOverrides, FabulousMaterialsPlugin},
     postfab::{PostFab, PostfabPipe},
     prefab::{Prefab, PrefabPipe},
     FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt,
@@ -76,7 +76,7 @@ fn load_minion_asset(
     mut cmds: Commands,
     mut fabs: ResMut<FabManager>,
     mut mats: ResMut<Assets<StandardMaterial>>,
-    mut mat_index: ResMut<NamedMaterialIndex<StandardMaterial, StandardMaterial>>,
+    mut mat_index: ResMut<FabMaterialOverrides<StandardMaterial, StandardMaterial>>,
 ) {
     let gltf_handle = asset_server.load("earthminion.glb");
 
@@ -103,7 +103,7 @@ fn load_minion_asset(
     fabs.register_postfab(PostFab {
         scene: FabTarget::Gltf(gltf_handle),
         pipes: vec![
-            PostfabPipe::new(cmds.register_one_shot_system(add_scalar_to_orbiters))
+            PostfabPipe::system(cmds.register_one_shot_system(add_scalar_to_orbiters))
                 .name_contains("Orbiter")
                 .root_only(),
         ],

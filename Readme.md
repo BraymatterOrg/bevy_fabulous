@@ -12,10 +12,38 @@ using heavy tooling, or opinionated plugins.
 
 Bevy Fabulous provides to mechanisms to enrich a GLTF loaded Scene: **Prefabs** and **PostFabs**
 
+Here is an example of what bevy_fabulous can let you do with a loaded GLTF asset:
+```rs
+fn init_fireminion(
+    mut fabs: ResMut<FabManager>,
+    mut fabmats: ResMut<FabMaterialOverrides<StandardMaterial, StandardMaterial>>,
+    assets: ResMut<MinionAssets>,
+    relic_oneshots: Res<RelicOneshots>,
+){
+    fabmats.register_main_mat("FireMana", assets.fire_mana.clone());
+    
+    fabs.register_postfab(PostFab {
+        scene: FabTarget::Gltf(assets.fire_minion.clone()),
+        pipes: vec![
+            PostfabPipe::entity(AttachBundle::new(Bitsploder(MagicElement::Fire, 100))).root_only(),
+            PostfabPipe::entity(AttachBundle::new((ShopCleanup, ExplosionDebris))).with_components(vec![TypeId::of::<Handle<Mesh>>()]),
+            PostfabPipe::system(relic_oneshots.on_minion_spawn_system)
+        ]
+    })
+}
+```
+
+### Planned features:
+- [ ] Give same component/name/root filtering to `PrefabPipes`, ideally unifying Prefab + Postfab pipe featuresets
+- [ ] Allow PostfabPipes to operate on any Entity and it's children, not just GLTF/Scenes (This may already be possible by just adding PostFabs to the entity)
+- [ ] Include batteries in the crate with some pre-made pipes for common operations
+
 ## Prefabs
 
 Prefabs modify the loaded scene world directly, applying gameplay components to entities in the Scene world directly. This only
 needs to run once as the components are then part of the Scene, so any subsequent spawns of `SceneBundle` will have the components.
+
+Prefabs are good for adding contextless gameplay components, i.e components that you want to add onto the model's nodes regardless of when/where you spawn it
 
 Prefabs contain a path to the asset, which is used as the key to a `HashMap<String, Prefab>` in the `FabManager` resource.
 
