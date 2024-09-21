@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
     utils::HashMap,
 };
-use postfab::{add_postfabs_to_spawned_scene, handle_scene_postfabs, PostFab};
+use postfab::{add_postfabs_to_spawned_scene, handle_scene_postfabs, PostFab, PostFabVariant};
 use prefab::{apply_pipes_to_loaded_scene, Prefab};
 
 pub mod materials;
@@ -213,6 +213,7 @@ impl GltfScene {
     }
 }
 
+#[derive(Clone)]
 pub struct SpawnGltfScene<B: Bundle> {
     pub gltf: Handle<Gltf>,
     pub scene_idx: usize,
@@ -271,12 +272,55 @@ impl<B: Bundle> Command for SpawnGltfScene<B> {
     }
 }
 
+pub struct SpawnPostfabVariant<B: Bundle + Clone>{
+    pub scene: SpawnGltfScene<B>,
+    pub variance: PostFabVariant,
+}
+
+impl<B: Bundle + Clone> Command for SpawnPostfabVariant<B>{
+    fn apply(self, world: &mut World) {
+        let mut sys_state = SystemState::<(Res<Assets<Gltf>>, Commands)>::new(world);
+        let (gltfs, mut cmds) = sys_state.get(world);
+
+        let Some(gltf) = gltfs.get(&self.scene.gltf) else {
+            warn!("Could not get GLTF for SpawnGltfScene");
+            return;
+        };
+
+        let Some(scene) = gltf.scenes.get(self.scene.scene_idx) else {
+            warn!(
+                "Could not find scene at index {} to spawn gltf scene",
+                self.scene.scene_idx
+            );
+            return;
+        };
+
+        let mut spawned_scene = cmds.spawn((SceneBundle {
+            scene: scene.clone(),
+            transform: self.scene.location,
+            ..default()
+        },));
+
+        if let Some(bundle) = self.scene.bundle {
+            spawned_scene.insert((bundle, self.variance));
+        }else{
+            spawned_scene.insert(self.variance);
+        }
+
+        sys_state.apply(world);
+    }
+}
 pub trait SpawnGltfCmdExt {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T);
+    fn spawn_gltf_variant<T: Into<SpawnPostfabVariant<B>>, B: Bundle + Clone>(&mut self, cmd: T);
 }
 
 impl<'w, 's> SpawnGltfCmdExt for Commands<'w, 's> {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) {
+        self.add(cmd.into());
+    }
+    
+    fn spawn_gltf_variant<T: Into<SpawnPostfabVariant<B>>, B: Bundle + Clone>(&mut self, cmd: T) {
         self.add(cmd.into());
     }
 }

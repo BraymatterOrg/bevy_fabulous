@@ -2,10 +2,7 @@ use std::f32::consts::PI;
 
 use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
 use bevy_fabulous::{
-    materials::{FabMaterialOverrides, FabulousMaterialsPlugin},
-    postfab::{PostFab, PostfabPipe},
-    prefab::{Prefab, PrefabPipe},
-    FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt,
+    materials::{FabMaterialOverrides, FabulousMaterialsPlugin}, postfab::{PostFab, PostfabPipe}, prefab::{Prefab, PrefabPipe}, prelude::PostFabVariant, FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt, SpawnPostfabVariant
 };
 
 fn main() {
@@ -51,8 +48,22 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
 
     info!("Spawning Minion");
 
+
     // Spawn Minion
-    cmds.spawn_gltf(GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion")));
+    
+    let variance = vec![
+        PostfabPipe::system(cmds.register_one_shot_system(add_scalar_to_orbiters))
+        .name_contains("Orbiter")
+        .root_only(),
+    ];
+
+    let a = GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion"));
+    cmds.spawn_gltf_variant(SpawnPostfabVariant{
+        scene: a,
+        variance: PostFabVariant{
+            variance,
+        },
+    });
 
     // Shine a little light on me
     cmds.spawn(DirectionalLightBundle {
@@ -103,11 +114,11 @@ fn load_minion_asset(
     fabs.register_postfab(PostFab {
         scene: FabTarget::Gltf(gltf_handle),
         pipes: vec![
-            PostfabPipe::system(cmds.register_one_shot_system(add_scalar_to_orbiters))
-                .name_contains("Orbiter")
-                .root_only(),
+            // PostfabPipe::system(cmds.register_one_shot_system(add_scalar_to_orbiters))
+            //     .name_contains("Orbiter")
+            //     .root_only(),
         ],
-    })
+    });
 }
 
 fn poll_loaded(

@@ -34,7 +34,7 @@ pub fn add_postfabs_to_spawned_scene(
 /// Iterates over all of the postfabs in the world, if there is a SceneInstance attached apply the hook
 pub fn handle_scene_postfabs(world: &mut World) {
     let mut system_state = SystemState::<(
-        Query<(Entity, &PostFab, &SceneInstance)>,
+        Query<(Entity, &PostFab, &SceneInstance, Option<&PostFabVariant>)>,
         Query<&Children>,
         Res<SceneSpawner>,
     )>::new(world);
@@ -43,15 +43,22 @@ pub fn handle_scene_postfabs(world: &mut World) {
     let mut pipes_to_run = vec![];
     let mut root_entities = vec![];
     //For every entity with a postfab
-    for (entity, postfab, instance) in postfabs.iter() {
+    for (entity, postfab, instance, variant) in postfabs.iter() {
         if !scene_spawner.instance_is_ready(**instance) {
             continue;
         }
 
+        //TODO: Figure out a way to not clone here >:(
         root_entities.push(entity);
+        let pipe_iterator = match variant {
+            Some(v) => {
+                Box::new(postfab.pipes.iter().chain(&v.variance)) as Box<dyn Iterator<Item = &PostfabPipe>>
+            },
+            None => Box::new(postfab.pipes.iter()),
+        };
 
         //Iterate over all of a postfabs pipe
-        for pipe in postfab.pipes.iter() {
+        for pipe in pipe_iterator {
             let applicable_ents = match pipe.root_only {
                 true => vec![entity],
                 false => std::iter::once(entity)
@@ -136,6 +143,15 @@ pub fn handle_scene_postfabs(world: &mut World) {
 pub struct PostFab {
     pub scene: FabTarget,
     pub pipes: Vec<PostfabPipe>,
+}
+
+#[derive(Component, Clone)]
+pub struct PostfabPipes{
+    pub pipes: Vec<PostfabPipe>,
+}
+#[derive(Clone, Component)]
+pub struct PostFabVariant{
+    pub variance: Vec<PostfabPipe>,
 }
 
 #[derive(Clone)]
