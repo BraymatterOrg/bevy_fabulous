@@ -2,7 +2,10 @@ use std::f32::consts::PI;
 
 use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
 use bevy_fabulous::{
-    materials::{FabMaterialOverrides, FabulousMaterialsPlugin}, postfab::{PostFab, PostfabPipe}, prefab::{Prefab, PrefabPipe}, prelude::PostFabVariant, FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt, SpawnPostfabVariant
+    materials::{FabMaterialOverrides, FabulousMaterialsPlugin},
+    postfab::{PostFab, PostfabPipe},
+    prefab::{Prefab, PrefabPipe},
+    FabManager, FabTarget, FabulousPlugin, GltfScene, SpawnGltfCmdExt,
 };
 
 fn main() {
@@ -48,22 +51,16 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
 
     info!("Spawning Minion");
 
-
     // Spawn Minion
-    
+
     let variance = vec![
         PostfabPipe::system(cmds.register_one_shot_system(add_scalar_to_orbiters))
-        .name_contains("Orbiter")
-        .root_only(),
+            .name_contains("Orbiter")
+            .root_only(),
     ];
 
     let a = GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion"));
-    cmds.spawn_gltf_variant(SpawnPostfabVariant{
-        scene: a,
-        variance: PostFabVariant{
-            variance,
-        },
-    });
+    cmds.spawn_gltf_variant(a, variance);
 
     // Shine a little light on me
     cmds.spawn(DirectionalLightBundle {
@@ -185,7 +182,7 @@ impl PrefabPipe for RotateHeadPipe {
 
         let mut ent: Option<Entity> = None;
         for (entity, name) in q {
-            if *name.to_string() == "MinionHead".to_string() {
+            if name.to_string() == *"MinionHead" {
                 ent = Some(entity);
                 break;
             }

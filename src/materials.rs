@@ -11,10 +11,10 @@ pub struct FabulousMaterialsPlugin<T: Material> {
     p: PhantomData<T>,
 }
 
-impl<T: Material> Plugin for FabulousMaterialsPlugin<T> {
+impl<T: Material + Default> Plugin for FabulousMaterialsPlugin<T> {
     fn build(&self, app: &mut App) {
         app.add_event::<SwapEvent>();
-        app.insert_resource(FabMaterialOverrides::<T, StandardMaterial>::new());
+        app.insert_resource(FabMaterialOverrides::<T, StandardMaterial>::default());
         app.add_systems(PostUpdate, (Self::replace_materials, Self::asset_watcher));
     }
 }
@@ -47,28 +47,25 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
         gltfs: Res<Assets<Gltf>>,
     ) {
         for event in asset_events.read() {
-            match event {
-                AssetEvent::LoadedWithDependencies { id } => {
-                    let Some(gltf) = gltfs.get(*id) else {
-                        error!("Received Asset Loaded Event for GLTF but no gltf found in assets");
-                        continue;
-                    };
+            if let AssetEvent::LoadedWithDependencies { id } = event {
+                let Some(gltf) = gltfs.get(*id) else {
+                    error!("Received Asset Loaded Event for GLTF but no gltf found in assets");
+                    continue;
+                };
 
-                    //For every named material in the gltf
-                    for (named, mat) in gltf.named_materials.iter() {
-                        //Check if it contains an override, if it does register the handle so it's swappeg out
-                        let name = named.to_string();
-                        if mat_registry.contains_override(&name) {
-                            mat_registry.register_swap_mat(named.to_string(), &mat.clone());
-                            events.send(SwapEvent);
-                        } else {
-                            //If it doesn't, put it into the unprocessed materials HashMap
-                            //so it can be picked up when the user (eventually) registers their main material
-                            mat_registry.register_mat_for_processing(name, mat);
-                        }
+                //For every named material in the gltf
+                for (named, mat) in gltf.named_materials.iter() {
+                    //Check if it contains an override, if it does register the handle so it's swappeg out
+                    let name = named.to_string();
+                    if mat_registry.contains_override(&name) {
+                        mat_registry.register_swap_mat(named.to_string(), &mat.clone());
+                        events.send(SwapEvent);
+                    } else {
+                        //If it doesn't, put it into the unprocessed materials HashMap
+                        //so it can be picked up when the user (eventually) registers their main material
+                        mat_registry.register_mat_for_processing(name, mat);
                     }
                 }
-                _ => {}
             }
         }
     }
@@ -79,7 +76,7 @@ pub struct SwapEvent;
 
 /// Used to track which material handles should be swapped for a 'main-material'
 /// Multiple materials can be swapped for the same main material
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct FabMaterialOverrides<T: Material, G: Material> {
     /// Contains a map of the material name, to any materials that should be replaced by it
     pub swap_materials: HashMap<String, Vec<Handle<G>>>,
@@ -90,15 +87,6 @@ pub struct FabMaterialOverrides<T: Material, G: Material> {
 }
 
 impl<T: Material, G: Material> FabMaterialOverrides<T, G> {
-    /// Creates a new, empty material index
-    pub fn new() -> Self {
-        Self {
-            swap_materials: HashMap::new(),
-            main_materials: HashMap::new(),
-            unprocessed_materials: HashMap::new(),
-        }
-    }
-
     /// Register a new main material, materials loaded from GLTF's (Really anywhere) will be swapped out for the main material
     pub fn register_main_mat(&mut self, name: impl Into<String>, mat: Handle<T>) {
         let n = name.into();

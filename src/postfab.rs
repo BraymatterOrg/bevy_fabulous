@@ -51,9 +51,8 @@ pub fn handle_scene_postfabs(world: &mut World) {
         //TODO: Figure out a way to not clone here >:(
         root_entities.push(entity);
         let pipe_iterator = match variant {
-            Some(v) => {
-                Box::new(postfab.pipes.iter().chain(&v.variance)) as Box<dyn Iterator<Item = &PostfabPipe>>
-            },
+            Some(v) => Box::new(postfab.pipes.iter().chain(&v.variance))
+                as Box<dyn Iterator<Item = &PostfabPipe>>,
             None => Box::new(postfab.pipes.iter()),
         };
 
@@ -76,7 +75,7 @@ pub fn handle_scene_postfabs(world: &mut World) {
                 //Check if enity has required Name
                 match ent.get::<Name>() {
                     Some(n) => {
-                        if !pipe.name_criteria.eval(n) {
+                        if !pipe.name_criteria.iter().all(|criteria| criteria.eval(n)) {
                             continue 'child;
                         }
                     }
@@ -145,12 +144,14 @@ pub struct PostFab {
     pub pipes: Vec<PostfabPipe>,
 }
 
-#[derive(Component, Clone)]
-pub struct PostfabPipes{
-    pub pipes: Vec<PostfabPipe>,
+impl From<Vec<PostfabPipe>> for PostFabVariant {
+    fn from(value: Vec<PostfabPipe>) -> Self {
+        PostFabVariant { variance: value }
+    }
 }
+
 #[derive(Clone, Component)]
-pub struct PostFabVariant{
+pub struct PostFabVariant {
     pub variance: Vec<PostfabPipe>,
 }
 
@@ -171,8 +172,8 @@ pub struct PostfabPipe {
     pub with_components: Vec<TypeId>,
     /// Only apply pipe to entities without the following components
     pub without_components: Vec<TypeId>,
-    /// Only apply pipe to entities matching name criteria
-    pub name_criteria: NameCriteria,
+    /// Only apply pipe to entities matching one of the  name criteria
+    pub name_criteria: Vec<NameCriteria>,
     /// Only apply pipe to the scene root entity
     pub root_only: bool,
 }
@@ -184,7 +185,7 @@ impl PostfabPipe {
             executor: RunType::System(system),
             with_components: vec![],
             without_components: vec![],
-            name_criteria: NameCriteria::Any,
+            name_criteria: vec![],
             root_only: false,
         }
     }
@@ -195,7 +196,7 @@ impl PostfabPipe {
             executor: RunType::Command(cmd.dyn_clone()),
             with_components: vec![],
             without_components: vec![],
-            name_criteria: NameCriteria::Any,
+            name_criteria: vec![],
             root_only: false,
         }
     }
@@ -206,7 +207,7 @@ impl PostfabPipe {
             executor: RunType::Entity(cmd.dyn_clone()),
             with_components: vec![],
             without_components: vec![],
-            name_criteria: NameCriteria::Any,
+            name_criteria: vec![],
             root_only: false,
         }
     }
@@ -225,25 +226,57 @@ impl PostfabPipe {
 
     /// Apply only to entities in the scene/root with a name equal to the input
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.name_criteria = NameCriteria::Equals(name.into());
+        self.name_criteria.push(NameCriteria::Equals(name.into()));
         self
     }
 
     /// Apply only to entities in the scene/root with a name containing the input
     pub fn name_contains(mut self, name: impl Into<String>) -> Self {
-        self.name_criteria = NameCriteria::Contains(name.into());
+        self.name_criteria.push(NameCriteria::Contains(name.into()));
+        self
+    }
+
+    /// Apply only to entities in the scene/root with a name containing one of the inputs
+    pub fn name_contains_any(mut self, names: Vec<impl Into<String>>) -> Self {
+        self.name_criteria.push(NameCriteria::Any(
+            names
+                .into_iter()
+                .map(|v| NameCriteria::Contains(v.into()))
+                .collect(),
+        ));
         self
     }
 
     /// Apply only to entities in the scene/root with a name starting with the input
     pub fn name_starts_with(mut self, name: impl Into<String>) -> Self {
-        self.name_criteria = NameCriteria::StartsWith(name.into());
+        self.name_criteria
+            .push(NameCriteria::StartsWith(name.into()));
+        self
+    }
+
+    pub fn name_starts_with_any(mut self, names: Vec<impl Into<String>>) -> Self {
+        self.name_criteria.push(NameCriteria::Any(
+            names
+                .into_iter()
+                .map(|v| NameCriteria::StartsWith(v.into()))
+                .collect(),
+        ));
         self
     }
 
     /// Apply only to entities in the scene/root with a name ending with the input
     pub fn name_ends_with(mut self, name: impl Into<String>) -> Self {
-        self.name_criteria = NameCriteria::EndsWith(name.into());
+        self.name_criteria.push(NameCriteria::EndsWith(name.into()));
+        self
+    }
+
+    pub fn name_ends_with_any(mut self, names: Vec<impl Into<String>>) -> Self {
+        self.name_criteria.push(NameCriteria::Any(
+            names
+                .into_iter()
+                .map(|v| NameCriteria::EndsWith(v.into()))
+                .collect(),
+        ));
         self
     }
 
@@ -257,7 +290,7 @@ impl PostfabPipe {
 /// Name component criteria for determining whether a pipe should run on a given entity
 #[derive(Clone)]
 pub enum NameCriteria {
-    Any,
+    Any(Vec<NameCriteria>),
     Equals(String),
     Contains(String),
     StartsWith(String),
@@ -267,7 +300,7 @@ pub enum NameCriteria {
 impl NameCriteria {
     pub fn eval(&self, name: &Name) -> bool {
         match self {
-            NameCriteria::Any => true,
+            NameCriteria::Any(criteria) => criteria.iter().any(|c| c.eval(name)),
             NameCriteria::Equals(c) => c == &name.to_string(),
             NameCriteria::Contains(c) => name.to_string().contains(c.as_str()),
             NameCriteria::StartsWith(c) => name.starts_with(c.as_str()),
