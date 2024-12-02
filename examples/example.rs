@@ -54,7 +54,7 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
     // Spawn Minion
 
     let variance = vec![
-        PostfabPipe::system(cmds.register_one_shot_system(add_scalar_to_orbiters))
+        PostfabPipe::system(cmds.register_system(add_scalar_to_orbiters))
             .name_contains("Orbiter")
             .root_only(),
     ];
@@ -225,7 +225,7 @@ pub struct Rotate {
 
 pub fn rotate_over_time(mut rotators: Query<(&mut Transform, &Rotate)>, time: Res<Time>) {
     for (mut tsf, rotator) in rotators.iter_mut() {
-        tsf.rotate_y(rotator.rotation_rate * time.delta_seconds());
+        tsf.rotate_y(rotator.rotation_rate * time.delta_secs());
     }
 }
 
@@ -240,7 +240,7 @@ pub struct Bob {
 pub fn bob(mut bobbers: Query<(&mut Transform, &Bob)>, time: Res<Time>) {
     for (mut tsf, bobber) in bobbers.iter_mut() {
         tsf.translation.y =
-            bobber.anchor + (time.elapsed_seconds() * bobber.frequency).sin() * (bobber.amplitude);
+            bobber.anchor + (time.elapsed_secs() * bobber.frequency).sin() * (bobber.amplitude);
     }
 }
 
@@ -255,7 +255,7 @@ pub struct ScaleOverTime {
 fn scale(mut scaler: Query<(&mut Transform, &ScaleOverTime)>, time: Res<Time>) {
     for (mut tsf, scaler) in scaler.iter_mut() {
         tsf.scale = scaler.base_scale
-            + (time.elapsed_seconds() * scaler.frequency).sin().abs()
+            + (time.elapsed_secs() * scaler.frequency).sin().abs()
                 * (scaler.factor - scaler.base_scale);
     }
 }
