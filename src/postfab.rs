@@ -13,12 +13,12 @@ use crate::{DynCommand, DynEntityCommand, FabManager, FabTarget};
 /// replaced with a reference/HashMap lookup so we don't have to worry about the performance of
 /// a copy.
 pub fn add_postfabs_to_spawned_scene(
-    spawned_scenes: Query<(Entity, &Handle<Scene>), Added<Handle<Scene>>>,
+    spawned_scenes: Query<(Entity, &SceneRoot), Added<SceneRoot>>,
     fab_manager: Res<FabManager>,
     mut cmds: Commands,
 ) {
     for (entity, spawned_scene) in spawned_scenes.iter() {
-        let Some(postfab) = fab_manager.postfabs.get(spawned_scene) else {
+        let Some(postfab) = fab_manager.postfabs.get(&**spawned_scene) else {
             continue;
         };
 
@@ -67,7 +67,7 @@ pub fn handle_scene_postfabs(world: &mut World) {
 
             //Attempt to apply to the parent, then any children
             'child: for applicable_entity in applicable_ents {
-                let Some(ent) = world.get_entity(applicable_entity) else {
+                let Ok(ent) = world.get_entity(applicable_entity) else {
                     warn!("Could not get entity for postfab, aborting postfab");
                     continue;
                 };
@@ -157,7 +157,7 @@ pub struct PostFabVariant {
 
 #[derive(Clone)]
 pub enum RunType {
-    System(SystemId<Entity>),
+    System(SystemId<In<Entity>>),
     Entity(Box<dyn DynEntityCommand>),
     Command(Box<dyn DynCommand>),
 }
@@ -180,7 +180,7 @@ pub struct PostfabPipe {
 
 impl PostfabPipe {
     /// Run the system if an entity matches these criteria
-    pub fn system(system: SystemId<Entity, ()>) -> Self {
+    pub fn system(system: SystemId<In<Entity>, ()>) -> Self {
         Self {
             executor: RunType::System(system),
             with_components: vec![],

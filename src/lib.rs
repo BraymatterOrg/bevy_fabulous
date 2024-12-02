@@ -261,7 +261,7 @@ impl<B: Bundle> Command for SpawnGltfScene<B> {
         };
 
         let mut spawned_scene = cmds.spawn((SceneBundle {
-            scene: scene.clone(),
+            scene: SceneRoot(scene.clone()),
             transform: self.location,
             ..default()
         },));
@@ -298,7 +298,7 @@ impl<B: Bundle + Clone> Command for SpawnPostfabVariant<B> {
         };
 
         let mut spawned_scene = cmds.spawn((SceneBundle {
-            scene: scene.clone(),
+            scene: SceneRoot(scene.clone()),
             transform: self.scene.location,
             ..default()
         },));
@@ -328,7 +328,7 @@ pub trait SpawnGltfCmdExt {
 
 impl<'w, 's> SpawnGltfCmdExt for Commands<'w, 's> {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) {
-        self.add(cmd.into());
+        self.queue(cmd.into());
     }
 
     fn spawn_gltf_variant<
@@ -340,7 +340,7 @@ impl<'w, 's> SpawnGltfCmdExt for Commands<'w, 's> {
         scene: T,
         variance: V,
     ) {
-        self.add(SpawnPostfabVariant {
+        self.queue(SpawnPostfabVariant {
             scene: scene.into(),
             variance: PostFabVariant::from(variance.into()),
         });
@@ -356,7 +356,7 @@ pub trait DynCommand: Send + Sync {
 
 impl<T: Command + Clone + Sync> DynCommand for T {
     fn dyn_add(self: Box<Self>, cmd: &mut Commands) {
-        cmd.add(*self);
+        cmd.queue(*self);
     }
 
     fn dyn_apply(self: Box<Self>, world: &mut World) {
@@ -382,7 +382,7 @@ pub trait DynEntityCommand: Send + Sync {
 
 impl<T: EntityCommand + Clone + Sync> DynEntityCommand for T {
     fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands) {
-        cmd.add(*self);
+        cmd.queue(*self);
     }
 
     fn dyn_clone(&self) -> Box<dyn DynEntityCommand> {

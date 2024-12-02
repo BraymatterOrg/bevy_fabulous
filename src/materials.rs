@@ -24,14 +24,17 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
     /// make the swap
     fn replace_materials(
         mut cmds: Commands,
-        added_mats: Query<(Entity, &Handle<StandardMaterial>), Added<Handle<StandardMaterial>>>,
+        added_mats: Query<
+            (Entity, &MeshMaterial3d<StandardMaterial>),
+            Added<MeshMaterial3d<StandardMaterial>>,
+        >,
         index: Res<FabMaterialOverrides<T, StandardMaterial>>,
     ) {
         for (mat_ent, handle) in added_mats.iter() {
             if let Some(mat_to_swap) = index.get_swap_mat(handle) {
                 cmds.entity(mat_ent)
-                    .remove::<Handle<StandardMaterial>>()
-                    .insert(mat_to_swap);
+                    .remove::<MeshMaterial3d<StandardMaterial>>()
+                    .insert(MeshMaterial3d(mat_to_swap));
             }
         }
     }

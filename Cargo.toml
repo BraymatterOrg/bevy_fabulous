@@ -12,11 +12,11 @@ repository = "https://github.com/BraymatterOrg/bevy_fabulous"
 homepage = "https://github.com/BraymatterOrg/bevy_fabulous"
 
 [[example]]
-name="example"
+name = "example"
 
 [lib]
 name = "bevy_fabulous"
 path = "src/lib.rs"
 
 [dependencies]
-bevy="0.14"
+bevy = "0.15.0"
