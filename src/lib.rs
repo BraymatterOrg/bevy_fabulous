@@ -174,6 +174,8 @@ pub struct GltfScene {
     pub handle: Handle<Gltf>,
     pub scene_idx: usize,
     pub location: Transform,
+    //If present scene will be spawned 'into' the provided entity
+    pub entity: Option<Entity>
 }
 
 impl GltfScene {
@@ -190,6 +192,7 @@ impl GltfScene {
             gltf: self.handle,
             scene_idx: self.scene_idx,
             location: self.location,
+            entity: self.entity
         }
     }
 
@@ -199,6 +202,7 @@ impl GltfScene {
             gltf: self.handle,
             scene_idx: self.scene_idx,
             location: self.location,
+            entity: self.entity,
         }
     }
 
@@ -213,6 +217,11 @@ impl GltfScene {
         self.location = t;
         self
     }
+
+    pub fn into_entity(mut self, entity: Entity) -> Self {
+        self.entity = Some(entity);
+        self
+    }
 }
 
 #[derive(Clone)]
@@ -221,6 +230,9 @@ pub struct SpawnGltfScene<B: Bundle> {
     pub scene_idx: usize,
     pub location: Transform,
     pub bundle: Option<B>,
+
+    //If present will attach to the provided entity instead
+    pub entity: Option<Entity>,
 }
 
 impl<B: Bundle> SpawnGltfScene<B> {
@@ -293,7 +305,12 @@ impl<B: Bundle> Command for SpawnPostfabVariant<B> {
             return;
         };
 
-        let mut spawned_scene = cmds.spawn((SceneRoot(scene.clone()), self.scene.location));
+        let mut entcmds = match self.scene.entity {
+            Some(entity) => cmds.entity(entity),
+            None => cmds.spawn_empty(),
+        };
+
+        let spawned_scene = entcmds.insert((SceneRoot(scene.clone()), self.scene.location));
 
         if let Some(bundle) = self.scene.bundle {
             spawned_scene.insert((bundle, self.variance));
@@ -306,76 +323,106 @@ impl<B: Bundle> Command for SpawnPostfabVariant<B> {
 }
 
 pub trait SpawnGltfCmdExt {
-    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T);
+    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) -> Entity;
     fn spawn_gltf_variant<T: Into<SpawnGltfScene<B>>, B: Bundle, V: Into<Vec<PostfabPipe>>>(
         &mut self,
         scene: T,
         variance: V,
-    );
+    ) -> Entity;
 }
 
 impl SpawnGltfCmdExt for Commands<'_, '_> {
-    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) {
-        self.queue(cmd.into());
+    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) -> Entity {
+        
+        let mut spawn_gltf: SpawnGltfScene<B> = cmd.into(); 
+
+        match spawn_gltf.entity {
+            Some(ent) => {
+                self.queue(spawn_gltf);
+                ent
+            },
+            None => {
+                let id = self.spawn_empty().id();
+                spawn_gltf.entity = Some(id);
+                self.queue(spawn_gltf);
+                id
+            },
+        }
     }
 
     fn spawn_gltf_variant<T: Into<SpawnGltfScene<B>>, B: Bundle, V: Into<Vec<PostfabPipe>>>(
         &mut self,
         scene: T,
         variance: V,
-    ) {
-        self.queue(SpawnPostfabVariant {
-            scene: scene.into(),
-            variance: PostFabVariant::from(variance.into()),
-        });
+    ) -> Entity {
+        let mut scene: SpawnGltfScene<B> = scene.into();
+        match scene.entity {
+            Some(ent) => {
+                self.queue(SpawnPostfabVariant{
+                    scene,
+                    variance: PostFabVariant::from(variance.into())
+                });
+                ent
+            },
+            None => {
+                let id = self.spawn_empty().id();
+                scene.entity = Some(id);
+                self.queue(SpawnPostfabVariant {
+                    scene,
+                    variance: PostFabVariant::from(variance.into()),
+                });
+        
+                id
+            },
+        }
     }
 }
 
-/// For trait objects of commands, to be used where generics cannot
-pub trait DynCommand: Send + Sync {
-    fn dyn_add(self: Box<Self>, cmd: &mut Commands);
-    fn dyn_apply(self: Box<Self>, world: &mut World);
-    fn dyn_clone(&self) -> Box<dyn DynCommand>;
-}
-
-impl<T: Command + Clone + Sync> DynCommand for T {
-    fn dyn_add(self: Box<Self>, cmd: &mut Commands) {
-        cmd.queue(*self);
+    /// For trait objects of commands, to be used where generics cannot
+    pub trait DynCommand: Send + Sync {
+        fn dyn_add(self: Box<Self>, cmd: &mut Commands);
+        fn dyn_apply(self: Box<Self>, world: &mut World);
+        fn dyn_clone(&self) -> Box<dyn DynCommand>;
     }
 
-    fn dyn_apply(self: Box<Self>, world: &mut World) {
-        self.apply(world);
+    impl<T: Command + Clone + Sync> DynCommand for T {
+        fn dyn_add(self: Box<Self>, cmd: &mut Commands) {
+            cmd.queue(*self);
+        }
+
+        fn dyn_apply(self: Box<Self>, world: &mut World) {
+            self.apply(world);
+        }
+
+        fn dyn_clone(&self) -> Box<dyn DynCommand> {
+            Box::new(self.clone())
+        }
     }
 
-    fn dyn_clone(&self) -> Box<dyn DynCommand> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn DynCommand> {
-    fn clone(&self) -> Self {
-        self.dyn_clone()
-    }
-}
-
-/// For trait objects of commands, to be used where generics cannot
-pub trait DynEntityCommand: Send + Sync {
-    fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands);
-    fn dyn_clone(&self) -> Box<dyn DynEntityCommand>;
-}
-
-impl<T: EntityCommand + Clone + Sync> DynEntityCommand for T {
-    fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands) {
-        cmd.queue(*self);
+    impl Clone for Box<dyn DynCommand> {
+        fn clone(&self) -> Self {
+            self.dyn_clone()
+        }
     }
 
-    fn dyn_clone(&self) -> Box<dyn DynEntityCommand> {
-        Box::new(self.clone())
+    /// For trait objects of commands, to be used where generics cannot
+    pub trait DynEntityCommand: Send + Sync {
+        fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands);
+        fn dyn_clone(&self) -> Box<dyn DynEntityCommand>;
     }
-}
 
-impl Clone for Box<dyn DynEntityCommand> {
-    fn clone(&self) -> Self {
-        self.dyn_clone()
+    impl<T: EntityCommand + Clone + Sync> DynEntityCommand for T {
+        fn dyn_add(self: Box<Self>, cmd: &mut EntityCommands) {
+            cmd.queue(*self);
+        }
+
+        fn dyn_clone(&self) -> Box<dyn DynEntityCommand> {
+            Box::new(self.clone())
+        }
     }
-}
+
+    impl Clone for Box<dyn DynEntityCommand> {
+        fn clone(&self) -> Self {
+            self.dyn_clone()
+        }
+    }
