@@ -260,11 +260,7 @@ impl<B: Bundle> Command for SpawnGltfScene<B> {
             return;
         };
 
-        let mut spawned_scene = cmds.spawn((SceneBundle {
-            scene: SceneRoot(scene.clone()),
-            transform: self.location,
-            ..default()
-        },));
+        let mut spawned_scene = cmds.spawn((SceneRoot(scene.clone()), self.location));
 
         if let Some(bundle) = self.bundle {
             spawned_scene.insert(bundle);
@@ -274,12 +270,12 @@ impl<B: Bundle> Command for SpawnGltfScene<B> {
     }
 }
 
-pub struct SpawnPostfabVariant<B: Bundle + Clone> {
+pub struct SpawnPostfabVariant<B: Bundle> {
     pub scene: SpawnGltfScene<B>,
     pub variance: PostFabVariant,
 }
 
-impl<B: Bundle + Clone> Command for SpawnPostfabVariant<B> {
+impl<B: Bundle> Command for SpawnPostfabVariant<B> {
     fn apply(self, world: &mut World) {
         let mut sys_state = SystemState::<(Res<Assets<Gltf>>, Commands)>::new(world);
         let (gltfs, mut cmds) = sys_state.get(world);
@@ -297,11 +293,7 @@ impl<B: Bundle + Clone> Command for SpawnPostfabVariant<B> {
             return;
         };
 
-        let mut spawned_scene = cmds.spawn((SceneBundle {
-            scene: SceneRoot(scene.clone()),
-            transform: self.scene.location,
-            ..default()
-        },));
+        let mut spawned_scene = cmds.spawn((SceneRoot(scene.clone()), self.scene.location));
 
         if let Some(bundle) = self.scene.bundle {
             spawned_scene.insert((bundle, self.variance));
@@ -315,27 +307,19 @@ impl<B: Bundle + Clone> Command for SpawnPostfabVariant<B> {
 
 pub trait SpawnGltfCmdExt {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T);
-    fn spawn_gltf_variant<
-        T: Into<SpawnGltfScene<B>>,
-        B: Bundle + Clone,
-        V: Into<Vec<PostfabPipe>>,
-    >(
+    fn spawn_gltf_variant<T: Into<SpawnGltfScene<B>>, B: Bundle, V: Into<Vec<PostfabPipe>>>(
         &mut self,
         scene: T,
         variance: V,
     );
 }
 
-impl<'w, 's> SpawnGltfCmdExt for Commands<'w, 's> {
+impl SpawnGltfCmdExt for Commands<'_, '_> {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) {
         self.queue(cmd.into());
     }
 
-    fn spawn_gltf_variant<
-        T: Into<SpawnGltfScene<B>>,
-        B: Bundle + Clone,
-        V: Into<Vec<PostfabPipe>>,
-    >(
+    fn spawn_gltf_variant<T: Into<SpawnGltfScene<B>>, B: Bundle, V: Into<Vec<PostfabPipe>>>(
         &mut self,
         scene: T,
         variance: V,
