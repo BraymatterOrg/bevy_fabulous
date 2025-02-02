@@ -71,7 +71,6 @@ pub fn handle_scene_postfabs(world: &mut World) {
                     warn!("Could not get entity for postfab, aborting postfab");
                     continue;
                 };
-
                 //Check if enity has required Name
                 match ent.get::<Name>() {
                     Some(n) => {

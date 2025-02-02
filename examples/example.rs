@@ -50,6 +50,7 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
     info!("Spawning Minion");
 
     // Spawn Minion
+<<<<<<< HEAD
 
     let variance = vec![
         PostfabPipe::system(cmds.register_system(add_scalar_to_orbiters))
@@ -62,6 +63,13 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
 
     // Shine a little light on me
     cmds.spawn( DirectionalLight {
+=======
+    cmds.spawn_gltf(GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion")));
+
+    // Shine a little light on me
+    cmds.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+>>>>>>> c28f517e81cec2a1b7c5fa25a4ebbad831a75ee8
             shadows_enabled: true,
             color: Color::LinearRgba(LinearRgba {
                 red: 0.8,
