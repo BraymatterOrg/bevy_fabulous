@@ -17,6 +17,7 @@ name = "example"
 [lib]
 name = "bevy_fabulous"
 path = "src/lib.rs"
+crate-type = ["lib"]
 
 [dependencies]
-bevy = "0.15.0"
+bevy = "0.15.2"
