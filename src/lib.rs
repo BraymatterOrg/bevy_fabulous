@@ -378,6 +378,53 @@ impl SpawnGltfCmdExt for Commands<'_, '_> {
     }
 }
 
+impl SpawnGltfCmdExt for ChildBuilder<'_> {
+    fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) -> Entity {
+        let mut spawn_gltf: SpawnGltfScene<B> = cmd.into(); 
+
+        match spawn_gltf.entity {
+            Some(ent) => {
+                self.enqueue_command(spawn_gltf);
+                ent
+            },
+            None => {
+                let id = self.spawn_empty().id();
+                spawn_gltf.entity = Some(id);
+                self.enqueue_command(spawn_gltf);
+                id
+            },
+        }
+    }
+
+    fn spawn_gltf_variant<T: Into<SpawnGltfScene<B>>, B: Bundle, V: Into<Vec<PostfabPipe>>>(
+        &mut self,
+        scene: T,
+        variance: V,
+    ) -> Entity {
+        let mut scene: SpawnGltfScene<B> = scene.into();
+        match scene.entity {
+            Some(ent) => {
+                self.enqueue_command(SpawnPostfabVariant{
+                    scene,
+                    variance: PostFabVariant::from(variance.into())
+                });
+                ent
+            },
+            None => {
+                let id = self.spawn_empty().id();
+                scene.entity = Some(id);
+                self.enqueue_command(SpawnPostfabVariant {
+                    scene,
+                    variance: PostFabVariant::from(variance.into()),
+                });
+        
+                id
+            },
+        }
+    }
+}
+
+
     /// For trait objects of commands, to be used where generics cannot
     pub trait DynCommand: Send + Sync {
         fn dyn_add(self: Box<Self>, cmd: &mut Commands);
