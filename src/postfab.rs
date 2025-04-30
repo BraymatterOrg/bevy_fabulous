@@ -22,7 +22,7 @@ pub fn add_postfabs_to_spawned_scene(
             continue;
         };
 
-        let Some(mut entcmds) = cmds.get_entity(entity) else {
+        let Ok(mut entcmds) = cmds.get_entity(entity) else {
             warn!("Could not get entity with added scene in Postfab system");
             continue;
         };
@@ -112,7 +112,7 @@ pub fn handle_scene_postfabs(world: &mut World) {
     for (executor, ent) in pipes_to_run {
         match executor {
             RunType::System(system) => {
-                if let Err(e) = world.run_system_with_input(system, ent) {
+                if let Err(e) = world.run_system_with(system, ent) {
                     error!("Error running system for postfab pipe!\n {}", e);
                 }
             }
@@ -121,7 +121,7 @@ pub fn handle_scene_postfabs(world: &mut World) {
             }
             RunType::Entity(entcmd) => {
                 let mut world_cmds = world.commands();
-                let Some(mut entcmds) = world_cmds.get_entity(ent) else {
+                let Ok(mut entcmds) = world_cmds.get_entity(ent) else {
                     error!("Could not get entity for entity command postfab");
                     continue;
                 };

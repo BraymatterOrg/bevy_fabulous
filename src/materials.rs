@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, platform::collections::HashMap};
 
 /// Handles automatically swapping out materials with a specific name from a GLTF / Scene with a specific material.
 /// If you're using the StandardMaterial you can probably fiddle with the material in blender to get what you want,
@@ -62,7 +62,7 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
                     let name = named.to_string();
                     if mat_registry.contains_override(&name) {
                         mat_registry.register_swap_mat(named.to_string(), &mat.clone());
-                        events.send(SwapEvent);
+                        events.write(SwapEvent);
                     } else {
                         //If it doesn't, put it into the unprocessed materials HashMap
                         //so it can be picked up when the user (eventually) registers their main material

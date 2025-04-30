@@ -1,10 +1,7 @@
 use bevy::{
-    ecs::{
-        system::{EntityCommand, EntityCommands, SystemParam, SystemState},
-        world::Command,
-    },
+    ecs::system::{EntityCommand, EntityCommands, SystemParam, SystemState},
     prelude::*,
-    utils::HashMap,
+    platform::collections::HashMap,
 };
 use postfab::{
     add_postfabs_to_spawned_scene, handle_scene_postfabs, PostFab, PostFabVariant, PostfabPipe,
@@ -378,19 +375,19 @@ impl SpawnGltfCmdExt for Commands<'_, '_> {
     }
 }
 
-impl SpawnGltfCmdExt for ChildBuilder<'_> {
+impl SpawnGltfCmdExt for ChildSpawnerCommands<'_> {
     fn spawn_gltf<T: Into<SpawnGltfScene<B>>, B: Bundle>(&mut self, cmd: T) -> Entity {
         let mut spawn_gltf: SpawnGltfScene<B> = cmd.into(); 
 
         match spawn_gltf.entity {
             Some(ent) => {
-                self.enqueue_command(spawn_gltf);
+                self.commands().queue(spawn_gltf);
                 ent
             },
             None => {
                 let id = self.spawn_empty().id();
                 spawn_gltf.entity = Some(id);
-                self.enqueue_command(spawn_gltf);
+                self.commands().queue(spawn_gltf);
                 id
             },
         }
@@ -404,7 +401,7 @@ impl SpawnGltfCmdExt for ChildBuilder<'_> {
         let mut scene: SpawnGltfScene<B> = scene.into();
         match scene.entity {
             Some(ent) => {
-                self.enqueue_command(SpawnPostfabVariant{
+                self.commands().queue(SpawnPostfabVariant{
                     scene,
                     variance: PostFabVariant::from(variance.into())
                 });
@@ -413,7 +410,7 @@ impl SpawnGltfCmdExt for ChildBuilder<'_> {
             None => {
                 let id = self.spawn_empty().id();
                 scene.entity = Some(id);
-                self.enqueue_command(SpawnPostfabVariant {
+                self.commands().queue(SpawnPostfabVariant {
                     scene,
                     variance: PostFabVariant::from(variance.into()),
                 });
