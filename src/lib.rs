@@ -268,11 +268,16 @@ impl<B: Bundle> Command for SpawnGltfScene<B> {
             );
             return;
         };
+        
+        let mut entcmds = match self.entity {
+            Some(ent) => cmds.entity(ent),
+            None => cmds.spawn_empty(),
+        };
 
-        let mut spawned_scene = cmds.spawn((SceneRoot(scene.clone()), self.location));
+        entcmds.insert((SceneRoot(scene.clone()), self.location));
 
         if let Some(bundle) = self.bundle {
-            spawned_scene.insert(bundle);
+            entcmds.insert(bundle);
         }
 
         sys_state.apply(world);

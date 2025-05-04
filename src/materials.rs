@@ -52,7 +52,7 @@ impl<T: Material> FabulousMaterialsPlugin<T> {
         for event in asset_events.read() {
             if let AssetEvent::LoadedWithDependencies { id } = event {
                 let Some(gltf) = gltfs.get(*id) else {
-                    error!("Received Asset Loaded Event for GLTF but no gltf found in assets");
+                    debug!("Received Asset Loaded Event for GLTF but no gltf found in assets");
                     continue;
                 };
 
