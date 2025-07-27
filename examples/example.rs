@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use bevy::{color::palettes, core_pipeline::bloom::BloomSettings, prelude::*};
+use bevy::{color::palettes, core_pipeline::bloom::Bloom, prelude::*};
 use bevy_fabulous::{
     materials::{FabMaterialOverrides, FabulousMaterialsPlugin},
     postfab::{PostFab, PostfabPipe},
@@ -36,22 +36,21 @@ fn main() {
 fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
     //Spawn Camera
     cmds.spawn((
-        Camera3dBundle {
-            camera: Camera {
+        Camera3d::default(),
+        Camera {
                 hdr: true,
                 clear_color: ClearColorConfig::Custom(Color::BLACK.lighter(0.03)),
                 ..default()
             },
-            transform: Transform::from_translation(Vec3::new(10.0, 10.0, 10.0))
+        Transform::from_translation(Vec3::new(10.0, 10.0, 10.0))
                 .looking_at(Vec3::ZERO, Dir3::Y),
-            ..default()
-        },
-        BloomSettings::OLD_SCHOOL,
+        Bloom::OLD_SCHOOL,
     ));
 
     info!("Spawning Minion");
 
     // Spawn Minion
+<<<<<<< HEAD
 
     let variance = vec![
         PostfabPipe::system(cmds.register_system(add_scalar_to_orbiters))
@@ -63,8 +62,14 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
     cmds.spawn_gltf_variant(a, variance);
 
     // Shine a little light on me
+    cmds.spawn( DirectionalLight {
+=======
+    cmds.spawn_gltf(GltfScene::new(ex.asset_scene.clone()).with_bundle(Name::new("Minion")));
+
+    // Shine a little light on me
     cmds.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
+>>>>>>> c28f517e81cec2a1b7c5fa25a4ebbad831a75ee8
             shadows_enabled: true,
             color: Color::LinearRgba(LinearRgba {
                 red: 0.8,
@@ -74,9 +79,7 @@ fn setup_scene(mut cmds: Commands, ex: Res<ExampleResource>) {
             }),
             illuminance: 600.0,
             ..default()
-        },
-        ..default()
-    });
+        });
 }
 
 fn load_minion_asset(
