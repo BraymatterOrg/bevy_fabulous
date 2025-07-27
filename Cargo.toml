@@ -19,4 +19,4 @@ name = "bevy_fabulous"
 path = "src/lib.rs"
 
 [dependencies]
-bevy = "0.15.0"
+bevy = "0.16.1"
